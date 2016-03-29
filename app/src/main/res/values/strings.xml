@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">ResRemote</string>
+    <string name="title_activity_settings">Settings</string>
+
+    <!-- Strings related to Settings -->
+
+    <string name="pref_select_bt_device">Select Bluetooth Device</string>
+    <string-array name="pref_select_bt_device_entries">
+        <item>No Devices Found</item>
+    </string-array>
+    <string-array name="pref_select_bt_device_values">
+        <item>NO_DEVICE</item>
+    </string-array>
+    <string name="pref_select_bt_device_summary">No Device Selected</string>
+    <string name="pref_select_bt_device_default">NO_DEVICE</string>
+
+    <string name="pref_calibrate">Calibrate Touch Screen</string>
+
+    <string name="title_activity_calibrate_touch_screen">CalibrateTouchScreen</string>
+
+
+</resources>
