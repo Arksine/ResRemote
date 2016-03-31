@@ -1,7 +1,12 @@
 package com.arksine.resremote;
 
+import android.app.Notification;
+import android.app.PendingIntent;
 import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
@@ -27,6 +32,8 @@ import android.widget.Toast;
 public class ResRemoteService extends Service {
 
     private static String TAG = "ResRemoteService";
+    private static final int ONGOING_NOTIFICATION_ID = 6002;
+    private static final String STOP_SERVICE = "STOP_SERVICE";
 
     private ArduinoCom arduino;
     private Looper mServiceLooper;
@@ -40,11 +47,21 @@ public class ResRemoteService extends Service {
         public final int LISTEN = 2;
     };
 
+    private final BroadcastReceiver mStopReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (STOP_SERVICE.equals(action)) {
+                // stops all queued services
+                stopSelf();
+            }
+
+        }
+    };
+
 
     // Handler that receives messages from the thread
     private final class ServiceHandler extends Handler {
-
-
 
         public ServiceHandler(Looper looper) {
             super(looper);
@@ -90,6 +107,27 @@ public class ResRemoteService extends Service {
         // Get the HandlerThread's Looper and use it for our Handler
         mServiceLooper = thread.getLooper();
         mServiceHandler = new ServiceHandler(mServiceLooper);
+
+        // The code below registers a receiver that allows us
+        // to stop the service through an action shown on the notification.
+        IntentFilter filter = new IntentFilter(STOP_SERVICE);
+        registerReceiver(mStopReceiver, filter);
+        Intent stopIntent = new Intent(STOP_SERVICE);
+        PendingIntent stopPendingIntent = PendingIntent.getBroadcast(this, 0, stopIntent, 0);
+
+        // TODO: need to create better icons and add .setLargeIcon(bitmap) to the notification.
+        Intent notificationIntent = new Intent(this, ResRemoteActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+        Notification notification = new Notification.Builder(this)
+                .setContentTitle(getText(R.string.service_notification_title))
+                .setContentText("Service Running")
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentIntent(pendingIntent)
+                .addAction(R.drawable.ic_stop,
+                        "Stop Service", stopPendingIntent)
+                .build();
+
+        startForeground(ONGOING_NOTIFICATION_ID, notification);
     }
 
     @Override
@@ -134,6 +172,7 @@ public class ResRemoteService extends Service {
     @Override
     public void onDestroy() {
         mConnected = false;
+        unregisterReceiver(mStopReceiver);
         Toast.makeText(this, "service done", Toast.LENGTH_SHORT).show();
     }
 }

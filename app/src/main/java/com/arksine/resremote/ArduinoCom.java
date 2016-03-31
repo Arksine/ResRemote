@@ -64,7 +64,6 @@ public class ArduinoCom {
         getInputSettings(sharedPrefs);
 
         mConnected = true;
-        mRunning = true;
         return true;
     }
 
@@ -144,6 +143,8 @@ public class ArduinoCom {
 
     public void listenForInput() {
 
+        mRunning = true;
+
         while (mRunning) {
 
             if (isConnected()) {
@@ -163,6 +164,8 @@ public class ArduinoCom {
     }
 
     public void calibrate () {
+
+        mRunning = true;
         // TODO:  need to launch calibration activity, then listen for calibration date from arduino
         //        as the activity guides the user where to press.  After each press, we send an intent
         //        to the calibration activity guiding the user where to press next until calibration
@@ -172,6 +175,13 @@ public class ArduinoCom {
 
     public void disconnect () {
 
+    }
+
+    /**
+     * Stops any ongoing action that is thread blocking
+     */
+    public void stop() {
+        mRunning = false;
     }
 
 }

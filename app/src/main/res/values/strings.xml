@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">ResRemote</string>
     <string name="title_activity_settings">Settings</string>
+    <string name="service_notification_title">Resistive Touch Remote</string>
 
     <!-- Strings related to Settings -->
 
