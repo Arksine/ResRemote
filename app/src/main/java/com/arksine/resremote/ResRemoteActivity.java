@@ -20,15 +20,15 @@ import java.util.Set;
 public class ResRemoteActivity extends Activity {
 
     private static String TAG = "ResRemoteActivity";
-    private static final int REQUEST_ENABLE_BT = 6001;
 
     private boolean bluetoothEnabled = false;
+    private static BluetoothManager btManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        startBluetooth();
+        btManager = new BluetoothManager(this);
 
         if (bluetoothEnabled) {
             // TODO: start the service here if it isn't already started
@@ -44,7 +44,7 @@ public class ResRemoteActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (requestCode == REQUEST_ENABLE_BT) {
+        if (requestCode == R.integer.REQUEST_ENABLE_BT) {
             if (resultCode == RESULT_OK) {
                 bluetoothEnabled = true;
             }
@@ -57,26 +57,6 @@ public class ResRemoteActivity extends Activity {
         }
     }
 
-    private void startBluetooth() {
-
-        BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (mBluetoothAdapter == null) {
-            // Device does not support Bluetooth, return an empty list
-            Toast.makeText(this, "This device does not support bluetooth",
-                    Toast.LENGTH_SHORT).show();
-
-            bluetoothEnabled = false;
-            return;
-        }
-
-        if (!mBluetoothAdapter.isEnabled()) {
-            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
-        }
-        else {
-            bluetoothEnabled = true;
-        }
-    }
 
     public static class SettingsFragment extends PreferenceFragment {
 
@@ -89,9 +69,12 @@ public class ResRemoteActivity extends Activity {
 
             PreferenceScreen root = this.getPreferenceScreen();
             PreferenceScreen calibrate = (PreferenceScreen) root.findPreference("pref_key_calibrate") ;
+            PreferenceScreen startService = (PreferenceScreen) root.findPreference("pref_key_start_service");
+            PreferenceScreen stopService = (PreferenceScreen) root.findPreference("pref_key_stop_service");
             ListPreference selectDevice = (ListPreference) root.findPreference("pref_key_select_bt_device");
 
-            ArrayList<String> mAdapterList = enumerateBluetoothDevices();
+
+            ArrayList<String> mAdapterList = btManager.enumerateDevices();
             populateDeviceListView(mAdapterList, selectDevice);
 
             selectDevice.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
@@ -107,44 +90,37 @@ public class ResRemoteActivity extends Activity {
                 }
             });
 
+            startService.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+
+                    // TODO: start service here
+
+                    return true;
+                }
+            });
+
+            stopService.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+
+                    // TODO: broadcast stop service intent here
+
+                    return true;
+                }
+            });
+
             // Listen for a click on the calibrate preference, and start the service in calibrate
             // mode if it exists.
             calibrate.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
                 @Override
                 public boolean onPreferenceClick(Preference preference) {
 
-                    // TODO: launch service in calibrate mode
-
+                    // TODO: Set isCalibrated shared preference to false and launch service
 
                     return true;
                 }
             });
-        }
-
-        private ArrayList<String> enumerateBluetoothDevices() {
-
-            ArrayList<String> mAdapterList = new ArrayList<>(5);
-
-            // We know the bluetooth adapter is enabled, so we can retrieve it
-            // and get devices that are mapped
-            BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-            Set<BluetoothDevice> pairedDevices = mBluetoothAdapter.getBondedDevices();
-
-            // If there are paired devices
-            if (pairedDevices.size() > 0) {
-                // Loop through paired devices
-                for (BluetoothDevice device : pairedDevices) {
-
-                    // TODO: may need to compare the device name to a list of supported
-                    //       devices before adding, as it doesn't appear I can get the
-                    //       device profiles supported
-
-                    // Add the name and address to an array adapter to show in a ListView
-                    mAdapterList.add(device.getName() + "\n" + device.getAddress());
-                }
-            }
-
-            return mAdapterList;
         }
 
         private void populateDeviceListView(ArrayList<String> mAdapterList,

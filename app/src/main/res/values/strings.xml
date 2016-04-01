@@ -2,6 +2,7 @@
     <string name="app_name">ResRemote</string>
     <string name="title_activity_settings">Settings</string>
     <string name="service_notification_title">Resistive Touch Remote</string>
+    <string name="ACTION_STOP_SERVICE">ACTION_STOP_SERVICE</string>
 
     <!-- Strings related to Settings -->
 
@@ -15,9 +16,10 @@
     <string name="pref_select_bt_device_summary">No Device Selected</string>
     <string name="pref_select_bt_device_default">NO_DEVICE</string>
 
+    <string name="pref_start_service">Start Service</string>
+    <string name="pref_stop_service">Stop Service</string>
     <string name="pref_calibrate">Calibrate Touch Screen</string>
 
     <string name="title_activity_calibrate_touch_screen">CalibrateTouchScreen</string>
-
 
 </resources>

@@ -32,33 +32,23 @@ import android.widget.Toast;
 public class ResRemoteService extends Service {
 
     private static String TAG = "ResRemoteService";
-    private static final int ONGOING_NOTIFICATION_ID = 6002;
-    private static final String STOP_SERVICE = "STOP_SERVICE";
+    private ArduinoCom arduino = null;
 
-    private ArduinoCom arduino;
-    private Looper mServiceLooper;
-    private ServiceHandler mServiceHandler;
-    private volatile boolean mConnected = false;
+    public class StopReciever extends BroadcastReceiver {
+        public StopReciever() {
+        }
 
-
-    private final class ProcessType {
-        public final int CONNECT = 0;
-        public final int CALIBRATE = 1;
-        public final int LISTEN = 2;
-    };
-
-    private final BroadcastReceiver mStopReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-            if (STOP_SERVICE.equals(action)) {
+            if (getString(R.string.ACTION_STOP_SERVICE).equals(action)) {
                 // stops all queued services
                 stopSelf();
             }
 
         }
-    };
-
+    }
+    private final StopReciever mStopReceiver = new StopReciever();
 
     // Handler that receives messages from the thread
     private final class ServiceHandler extends Handler {
@@ -70,31 +60,24 @@ public class ResRemoteService extends Service {
         @Override
         public void handleMessage(Message msg) {
 
-            switch (msg.arg2) {
-                case ProcessType.CONNECT:
-                    arduino.connect();
-                    break;
-                case ProcessType.CALIBRATE:
-                    arduino.calibrate();
-                    break;
-                case ProcessType.LISTEN:
-                    arduino.listenForInput();
-                    break;
-                default:
-                    stopSelf(msg.arg1);
+            arduino = new ArduinoCom((Context)msg.obj);
+            if (arduino.isConnected()) {
+                arduino.run();
             }
 
+            arduino.disconnect();
+            arduino = null;
 
             // Stop the service using the startId, so that we don't stop
             // the service in the middle of handling another job
             stopSelf(msg.arg1);
         }
     }
+    private Looper mServiceLooper;
+    private ServiceHandler mServiceHandler;
 
     @Override
     public void onCreate() {
-
-        arduino = new ArduinoCom(this);
 
         // Start up the thread running the service.  Note that we create a
         // separate thread because the service normally runs in the process's
@@ -110,14 +93,22 @@ public class ResRemoteService extends Service {
 
         // The code below registers a receiver that allows us
         // to stop the service through an action shown on the notification.
-        IntentFilter filter = new IntentFilter(STOP_SERVICE);
+        IntentFilter filter = new IntentFilter(getString(R.string.ACTION_STOP_SERVICE));
         registerReceiver(mStopReceiver, filter);
-        Intent stopIntent = new Intent(STOP_SERVICE);
-        PendingIntent stopPendingIntent = PendingIntent.getBroadcast(this, 0, stopIntent, 0);
 
-        // TODO: need to create better icons and add .setLargeIcon(bitmap) to the notification.
+        //TODO:  Need to make sure that adding .setClass works for the broadcast reciever
+        Intent stopIntent = new Intent(getString(R.string.ACTION_STOP_SERVICE))
+                .setClass(this, ResRemoteService.StopReciever.class);
+        PendingIntent stopPendingIntent = PendingIntent.getBroadcast(this, R.integer.REQUEST_STOP_SERVICE,
+                stopIntent, 0);
+
+        // TODO: need to create and add .setLargeIcon(bitmap) to the notification.
+        // TODO: need to create another action, that allows me to send a write command to the
+        //         arduino that toggles the touchscreen switcher on and off (it probably just
+        //         needs to send a pulse
         Intent notificationIntent = new Intent(this, ResRemoteActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this,
+                R.integer.REQUEST_START_RESREMOTE_ACTIVITY, notificationIntent, 0);
         Notification notification = new Notification.Builder(this)
                 .setContentTitle(getText(R.string.service_notification_title))
                 .setContentText("Service Running")
@@ -127,34 +118,20 @@ public class ResRemoteService extends Service {
                         "Stop Service", stopPendingIntent)
                 .build();
 
-        startForeground(ONGOING_NOTIFICATION_ID, notification);
+        startForeground(R.integer.ONGOING_NOTIFICATION_ID, notification);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Toast.makeText(this, "service starting", Toast.LENGTH_SHORT).show();
 
-
-
-
-        // TODO: need to call connect from the Service handler, as it relies on serial communication
-        //       and would block the ui thread
-        if (!arduino.isConnected()) {
-
-            // For each start request, send a message to start a job and deliver the
-            // start ID so we know which request we're stopping when we finish the job
-            Message msg = mServiceHandler.obtainMessage();
-            msg.arg1 = startId;
-            msg.arg2 = ProcessType.CONNECT;
-            mServiceHandler.sendMessage(msg);
+        // Stop the current thread if its running, so we can launch a new one (perhaps to calibrate)
+        if (arduino != null) {
+            arduino.stop();
         }
-
-        // TODO: Need to get extras from intent to determine if this is a command to calibrate
-        //       or a command to process input
 
         Message msg = mServiceHandler.obtainMessage();
         msg.arg1 = startId;
-        msg.arg2 = ProcessType.LISTEN;   //
+        msg.obj = this;
         mServiceHandler.sendMessage(msg);
 
         // If we get killed, after returning from here, restart
@@ -171,8 +148,10 @@ public class ResRemoteService extends Service {
 
     @Override
     public void onDestroy() {
-        mConnected = false;
+
         unregisterReceiver(mStopReceiver);
-        Toast.makeText(this, "service done", Toast.LENGTH_SHORT).show();
+        if (arduino != null) {
+            arduino.disconnect();
+        }
     }
 }

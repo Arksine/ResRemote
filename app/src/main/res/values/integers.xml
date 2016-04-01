@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Integers used to identify intents -->
+    <integer name="REQUEST_ENABLE_BT">6001</integer>
+    <integer name="ONGOING_NOTIFICATION_ID">6002</integer>
+    <integer name="REQUEST_STOP_SERVICE">6003</integer>
+    <integer name="REQUEST_START_RESREMOTE_ACTIVITY">6004</integer>
+</resources>
