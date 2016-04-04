@@ -16,6 +16,11 @@
         android:key="pref_key_stop_service"
         android:title="@string/pref_stop_service" >
     </PreferenceScreen>
+    <CheckBoxPreference
+        android:key="pref_key_allow_portrait"
+        android:title="@string/pref_allow_portrait"
+        android:summary="@string/pref_allow_portrait_summary"
+        android:defaultValue="false" />
     <PreferenceScreen
         android:key="pref_key_calibrate"
         android:title="@string/pref_calibrate" >

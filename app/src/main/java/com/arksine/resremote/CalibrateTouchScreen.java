@@ -8,24 +8,11 @@ import android.os.Handler;
 import android.view.MotionEvent;
 import android.view.View;
 
-//TODO: Create a tutorial interface that guides the user though touching
-//      the upper left corner, the upper right corner, then the bottom right corner
 
 /**
  *Provides a User Interface for Resistive Touch Screen Calibration
  */
 public class CalibrateTouchScreen extends Activity {
-    /**
-     * Whether or not the system UI should be auto-hidden after
-     * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
-     */
-    private static final boolean AUTO_HIDE = true;
-
-    /**
-     * If {@link #AUTO_HIDE} is set, the number of milliseconds to wait after
-     * user interaction before hiding the system UI.
-     */
-    private static final int AUTO_HIDE_DELAY_MILLIS = 3000;
 
     /**
      * Some older devices needs a small delay between UI widget updates
@@ -63,7 +50,7 @@ public class CalibrateTouchScreen extends Activity {
 
         }
     };
-    private boolean mVisible;
+
     private final Runnable mHideRunnable = new Runnable() {
         @Override
         public void run() {
@@ -71,44 +58,32 @@ public class CalibrateTouchScreen extends Activity {
         }
     };
 
+    // TODO: Create a broadcast listener that listens for events from the ArduinoCom class.
+    //       Each event tells us that a point has been received from the touch screen, therefore
+    //       we should animate the showcaseview to the next point
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_calibrate_touch_screen);
 
-        mVisible = true;
+        // TODO: Add an actual image to the background
         mContentView = findViewById(R.id.background);
 
+        mHideHandler.post(mHideRunnable);
 
-        // Set up the user interaction to manually show or hide the system UI.
-        mContentView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                toggle();
-            }
-        });
+        // TODO: lock rotation to landscape
+
+        // TODO: Create a Showcase view that animates through the various points required
+        //       for calibration
+
+
+
 
 
     }
 
-    @Override
-    protected void onPostCreate(Bundle savedInstanceState) {
-        super.onPostCreate(savedInstanceState);
-
-        // Trigger the initial hide() shortly after the activity has been
-        // created, to briefly hint to the user that UI controls
-        // are available.
-        delayedHide(100);
-    }
-
-    private void toggle() {
-        if (mVisible) {
-            hide();
-        } else {
-            show();
-        }
-    }
 
     private void hide() {
         // Hide UI first
@@ -116,31 +91,11 @@ public class CalibrateTouchScreen extends Activity {
         if (actionBar != null) {
             actionBar.hide();
         }
-        mVisible = false;
 
         // Schedule a runnable to remove the status and navigation bar after a delay
         mHideHandler.removeCallbacks(mShowPart2Runnable);
         mHideHandler.postDelayed(mHidePart2Runnable, UI_ANIMATION_DELAY);
     }
 
-    @SuppressLint("InlinedApi")
-    private void show() {
-        // Show the system bar
-        mContentView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-        mVisible = true;
 
-        // Schedule a runnable to display UI elements after a delay
-        mHideHandler.removeCallbacks(mHidePart2Runnable);
-        mHideHandler.postDelayed(mShowPart2Runnable, UI_ANIMATION_DELAY);
-    }
-
-    /**
-     * Schedules a call to hide() in [delay] milliseconds, canceling any
-     * previously scheduled calls.
-     */
-    private void delayedHide(int delayMillis) {
-        mHideHandler.removeCallbacks(mHideRunnable);
-        mHideHandler.postDelayed(mHideRunnable, delayMillis);
-    }
 }

@@ -98,7 +98,7 @@ public class ResRemoteService extends Service {
 
         //TODO:  Need to make sure that adding .setClass works for the broadcast reciever
         Intent stopIntent = new Intent(getString(R.string.ACTION_STOP_SERVICE))
-                .setClass(this, ResRemoteService.StopReciever.class);
+                .setClass(getApplicationContext(), ResRemoteService.StopReciever.class);
         PendingIntent stopPendingIntent = PendingIntent.getBroadcast(this, R.integer.REQUEST_STOP_SERVICE,
                 stopIntent, 0);
 

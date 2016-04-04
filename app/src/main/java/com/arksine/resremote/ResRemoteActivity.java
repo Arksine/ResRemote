@@ -5,11 +5,14 @@ import android.app.Notification;
 import android.app.PendingIntent;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.preference.PreferenceScreen;
 import android.util.Log;
 import android.widget.Toast;
@@ -31,7 +34,6 @@ public class ResRemoteActivity extends Activity {
         btManager = new BluetoothManager(this);
 
         if (bluetoothEnabled) {
-            // TODO: start the service here if it isn't already started
 
             getFragmentManager().beginTransaction()
                     .add(android.R.id.content, new SettingsFragment())
@@ -60,6 +62,8 @@ public class ResRemoteActivity extends Activity {
 
     public static class SettingsFragment extends PreferenceFragment {
 
+        // TODO:  Need to add option to calibrate both landscape and portrait, or just force landscape?
+
         @Override
         public void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
@@ -73,6 +77,7 @@ public class ResRemoteActivity extends Activity {
             PreferenceScreen stopService = (PreferenceScreen) root.findPreference("pref_key_stop_service");
             ListPreference selectDevice = (ListPreference) root.findPreference("pref_key_select_bt_device");
 
+            selectDevice.setSummary(selectDevice.getEntry());
 
             ArrayList<String> mAdapterList = btManager.enumerateDevices();
             populateDeviceListView(mAdapterList, selectDevice);
@@ -94,8 +99,9 @@ public class ResRemoteActivity extends Activity {
                 @Override
                 public boolean onPreferenceClick(Preference preference) {
 
-                    // TODO: start service here
-
+                    Context mContext = getActivity();
+                    Intent startIntent = new Intent(mContext, ResRemoteService.class);
+                    mContext.startService(startIntent);
                     return true;
                 }
             });
@@ -104,7 +110,10 @@ public class ResRemoteActivity extends Activity {
                 @Override
                 public boolean onPreferenceClick(Preference preference) {
 
-                    // TODO: broadcast stop service intent here
+                    Context mContext = getActivity().getApplicationContext();
+                    Intent stopIntent = new Intent(getString(R.string.ACTION_STOP_SERVICE))
+                            .setClass(mContext, ResRemoteService.StopReciever.class );
+                    mContext.sendBroadcast(stopIntent);
 
                     return true;
                 }
@@ -116,7 +125,14 @@ public class ResRemoteActivity extends Activity {
                 @Override
                 public boolean onPreferenceClick(Preference preference) {
 
-                    // TODO: Set isCalibrated shared preference to false and launch service
+                    // Set isCalibrated shared preference to false and launch service
+                    Context mContext = getActivity();
+                    SharedPreferences sharedPrefs =
+                            PreferenceManager.getDefaultSharedPreferences(mContext);
+                    sharedPrefs.edit().putBoolean("pref_key_isCalibrated", false).apply();
+
+                    Intent startIntent = new Intent(mContext, ResRemoteService.class);
+                    mContext.startService(startIntent);
 
                     return true;
                 }

@@ -12,141 +12,96 @@ public class NativeInput {
 
     private static String TAG = "NativeInput";
 
-    private Point screenTopLeftCoord;
-    private Point screenTopRightCoord;
-    private Point screenBottomRightCoord;
+    // coordinate converson coefficients
+    private float A;
+    private float B;
+    private float C;
+    private float D;
+    private float E;
+    private float F;
 
-    // TODO: Android device coordinates should go from top to right (X) and top to bottom (Y),
-    //       so we only need the max coordinates.  We need to check this to make sure
-    private int deviceXMax;
-    private int deviceYMax;
-
-    private int xOffset;
-    private int yOffset;
-
-    private float xMultiplier;
-    private float yMultiplier;
-
-    private boolean xInverted;
-    private boolean yInverted;
+    private int pressureOffset;
+    private float pressureCoef;
 
     NativeInput() {
 
-        screenTopLeftCoord = new Point(0,0);
-        screenTopRightCoord = new Point(1920, 0);
-        screenBottomRightCoord = new Point(1920, 1080);
-
-        deviceXMax = 1920;
-        deviceYMax = 1080;
-
-        xOffset = 0;
-        yOffset = 0;
-
-        xMultiplier = 1;
-        yMultiplier = 1;
+        A = 0.0f;
+        B = 0.0f;
+        C = 0.0f;
+        D = 0.0f;
+        E = 0.0f;
+        F = 0.0f;
 
     }
 
-    NativeInput(Point screenTopLeftCoord, Point screenTopRightCoord,
-                Point screenBottomRightCoord, int deviceXMax,
-                int deviceYMax) {
+    // TODO: Even though I'm calculating Z, I'll probably use an arbitrary pressure when sending
+    //       events to uInput in the first implementation.  I want to see how it works.
 
-        setCoordinates(screenTopLeftCoord, screenTopRightCoord, screenBottomRightCoord,
-                deviceXMax, deviceYMax);
+    NativeInput(float A, float B, float C, float D, float E, float F,
+                int zResistanceMin, int zResistanceMax) {
 
-    }
+        setCoefficients(A, B, C, D, E, F, zResistanceMin, zResistanceMax);
 
-    public void setCoordinates(Point screenTopLeftCoord, Point screenTopRightCoord,
-                                 Point screenBottomRightCoord, int deviceXMax,
-                                 int deviceYMax) {
-
-        this.screenTopLeftCoord = screenTopLeftCoord;
-        this.screenTopRightCoord = screenTopRightCoord;
-        this.screenBottomRightCoord = screenBottomRightCoord;
-
-        this.deviceXMax = deviceXMax;
-        this.deviceYMax = deviceYMax;
-
-        calibrate();
 
     }
 
-    private void calibrate() {
+    public void setCoefficients(float A, float B, float C, float D, float E, float F,
+            int zResistanceMin, int zResistanceMax) {
 
-        int difference;
+        this.A = A;
+        this.B = B;
+        this.C = C;
+        this.D = D;
+        this.E = E;
+        this.F = F;
 
-        if (screenTopLeftCoord.x < screenTopRightCoord.x) {
-            //x coordinates go from right to left
-            xOffset = screenTopLeftCoord.x;
-            difference = screenTopRightCoord.x - screenTopLeftCoord.x;
-            xInverted = false;
-        }
-        else
-        {
-            //x coordinates go from left to right
-            xOffset = screenTopRightCoord.x;
-            difference = screenTopLeftCoord.x - screenTopRightCoord.x;
-            xInverted = true;
-        }
+        calibratePressure(zResistanceMin, zResistanceMax);
 
-        xMultiplier =  deviceXMax / difference;
+    }
 
-        if (screenTopRightCoord.y < screenBottomRightCoord.y) {
-            //y coordinates from top to bottom
-            yOffset = screenTopRightCoord.y;
-            difference = screenBottomRightCoord.y - screenTopRightCoord.y;
-            yInverted = false;
-        }
-        else {
-            // y coordinates go from bottom to top
-            yOffset = screenBottomRightCoord.y;
-            difference = screenTopRightCoord.y - screenBottomRightCoord.y;
-            yInverted = true;
-        }
+	/**
+     * Calculates the coefficient required to convert the R-touch (resitance between the x and y
+     * screen layers) to ABS_MT_PRESSURE.  Resistance is the inverse of pressure, the lower the
+     * resistance the higher the pressure
+     *
+     * @param zResistanceMin
+     * @param zResistanceMax
+     */
+    private void calibratePressure(int zResistanceMin, int zResistanceMax) {
 
-        yMultiplier = deviceYMax / difference;
+        // zResistanceMin is proportional to ABS_MT_PRESSURE = 255;
+        // zResistanceMax is proportional to ABS_MT_PRESSURE = 0;
+
+        pressureOffset = zResistanceMin;
+        pressureCoef = 256 / (zResistanceMax - zResistanceMin);
+    }
+
+    public void processInput(TouchPoint screenCoord) {
+
+        TouchPoint deviceCoord = getDeviceCoord(screenCoord);
+
+        // TODO: Send deviceCoordinate to JNI code so events cant be processed by uInput
     }
 
     /**
      * Calculates a coordinate on the device given a touchscreen coordinate
-     * @param screenCoord
-     * @return
+     *
+     * @param screenCoord - coordinate received from the resistive touch screen
+     * @return deviceCoord - converted device coordinate
      */
-    private Point getDeviceCoord(Point screenCoord) {
+    private TouchPoint getDeviceCoord(TouchPoint screenCoord) {
+        TouchPoint deviceCoord;
 
-        int xCoord;
-        int yCoord;
+        int x;
+        int y;
+        int z;
 
-        // Calculate X
-        xCoord = Math.round((screenCoord.x - xOffset) * xMultiplier);
+        x = Math.round((A * screenCoord.getX()) + (B * screenCoord.getY()) + C);
+        y = Math.round((D * screenCoord.getX()) + (E * screenCoord.getY()) + F);
+        z = Math.round(255 - ((screenCoord.getZ() - pressureOffset)*pressureCoef));
 
-        if (xCoord < 0) {
-            xCoord = 0;
-        }
-        else if (xCoord > deviceXMax) {
-            xCoord = deviceXMax;
-        }
-
-        if (xInverted) {
-            xCoord = deviceXMax- xCoord;
-        }
-
-        // Calculate Y
-        yCoord = Math.round((screenCoord.y - yOffset) * yMultiplier);
-
-        if (yCoord < 0) {
-            yCoord = 0;
-        }
-        else if (yCoord > deviceYMax) {
-
-            yCoord = deviceYMax;
-        }
-
-        if (yInverted) {
-            yCoord = deviceYMax - yCoord;
-        }
-
-        return new Point(xCoord, yCoord);
+        deviceCoord = new TouchPoint(x, y, z);
+        return deviceCoord;
     }
 
 }

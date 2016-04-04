@@ -4,6 +4,7 @@
 
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:allowBackup="true"
@@ -14,12 +15,16 @@
         <service
             android:name=".ResRemoteService"
             android:enabled="true"
-            android:exported="true" />
+            android:exported="true"
+            android:permission="com.arksine.resremote.permission.ALLOW_START">
+            <intent-filter>
+                <action android:name="com.arksine.resremote.START_SERVICE" />
+            </intent-filter>
+        </service>
 
         <activity android:name=".ResRemoteActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>

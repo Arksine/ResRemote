@@ -56,6 +56,7 @@ public class ArduinoCom implements Runnable{
 
         @Override
         public void handleMessage(Message msg) {
+            ArduinoMessage message = parseBytes((byte[])msg.obj, msg.arg1);
 
             // TODO: send screen input to the NativeInput class here
         }
@@ -69,10 +70,12 @@ public class ArduinoCom implements Runnable{
 // TODO:  Need a broadcast reciever to listen for changes to the rotation so
     //        the uInput coordinates can be updated
 
-    // TODO: Need a broadcast reciever to listen for write commands?
+    // TODO: Need a broadcast reciever to listen for write commands.
 
-    // TODO:  Need to add option to lock rotation to landscape, or just do it by default
-
+    private class ArduinoMessage {
+        public String command;
+        public TouchPoint point;
+    }
 
     ArduinoCom(Context context) {
         mContext = context;
@@ -98,14 +101,13 @@ public class ArduinoCom implements Runnable{
         }
 
         // Tell the Arudino that it is time to start
-        String start = "<start>";
+        String start = "<START>";
         if (!writeData(start)) {
             // unable to write start command
             mConnected = false;
             return;
         }
 
-        // TODO: Need to PUT pref_key_iscalibrated as true in the CalibrateTouchScreen activity
         boolean isCalibrated = sharedPrefs.getBoolean("pref_key_iscalibrated", false);
 
         if (!isCalibrated) {
@@ -114,7 +116,7 @@ public class ArduinoCom implements Runnable{
                     Toast.LENGTH_SHORT).show();
 
             // Since the device isn't calibrated, we'll do it here.
-            calibrate();
+            calibrate(sharedPrefs);
         }
 
         getInputSettings(sharedPrefs);
@@ -166,69 +168,55 @@ public class ArduinoCom implements Runnable{
         return true;
     }
 
-    // TODO: change name to setScreenCoordinates?
+    // TODO: change name to setScreenCoefficents?
     private void getInputSettings(SharedPreferences sharedPrefs) {
 
-        Point screenTopLeftCoord;
-        Point screenTopRightCoord;
-        Point screenBottomRightCoord;
+        // Calibration coefficients
+        float A;
+        float B;
+        float C;
+        float D;
+        float E;
+        float F;
+
+        int zResistanceMin;
+        int zResistanceMax;
 
         DisplayManager displayManager = (DisplayManager)mContext.getSystemService(Context.DISPLAY_SERVICE);
         Display myDisplay = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
 
         int rotation = myDisplay.getRotation();
 
-        Point maxSize = new Point();
-        myDisplay.getRealSize(maxSize);
-
-        // TODO: coordinates need to be added to sharedpreferences in calibration function
-
-        // Get touch screen coordinates based on rotation
+        // Retreive coordinate coefficients based on rotation
         if (rotation == Surface.ROTATION_0 || rotation == Surface.ROTATION_180) {
             // Portrait
 
-            // get top left coordinates
-            int x = sharedPrefs.getInt("pref_key_portrait_top_left_x", 0);
-            int y = sharedPrefs.getInt("pref_key_portrait_top_left_y", 0);
-            screenTopLeftCoord = new Point(x,y);
-
-            // get top right coordinates
-            x = sharedPrefs.getInt("pref_key_portrait_top_right_x", maxSize.x);
-            y = sharedPrefs.getInt("pref_key_portrait_top_right_y", 0);
-            screenTopRightCoord = new Point(x,y);
-
-            // get top right coordinates
-            x = sharedPrefs.getInt("pref_key_portrait_bottom_right_x", maxSize.x);
-            y = sharedPrefs.getInt("pref_key_portrait_bottom_right_y", maxSize.y);
-            screenBottomRightCoord = new Point(x,y);
-
+            A = sharedPrefs.getFloat("pref_key_portrait_coefficient_a", 0.0f);
+            B = sharedPrefs.getFloat("pref_key_portrait_coefficient_b", 0.0f);
+            C = sharedPrefs.getFloat("pref_key_portrait_coefficient_c", 0.0f);
+            D = sharedPrefs.getFloat("pref_key_portrait_coefficient_d", 0.0f);
+            E = sharedPrefs.getFloat("pref_key_portrait_coefficient_e", 0.0f);
+            F = sharedPrefs.getFloat("pref_key_portrait_coefficient_f", 0.0f);
         }
         else {
             // Landscape
 
-            // get top left coordinates
-            int x = sharedPrefs.getInt("pref_key_landscape_top_left_x", 0);
-            int y = sharedPrefs.getInt("pref_key_landscape_top_left_y", 0);
-            screenTopLeftCoord = new Point(x,y);
-
-            // get top right coordinates
-            x = sharedPrefs.getInt("pref_key_landscape_top_right_x", maxSize.x);
-            y = sharedPrefs.getInt("pref_key_landscape_top_right_y", 0);
-            screenTopRightCoord = new Point(x,y);
-
-            // get top right coordinates
-            x = sharedPrefs.getInt("pref_key_landscape_bottom_right_x", maxSize.x);
-            y = sharedPrefs.getInt("pref_key_landscape_bottom_right_y", maxSize.y);
-            screenBottomRightCoord = new Point(x,y);
+            A = sharedPrefs.getFloat("pref_key_landscape_coefficient_a", 0.0f);
+            B = sharedPrefs.getFloat("pref_key_landscape_coefficient_b", 0.0f);
+            C = sharedPrefs.getFloat("pref_key_landscape_coefficient_c", 0.0f);
+            D = sharedPrefs.getFloat("pref_key_landscape_coefficient_d", 0.0f);
+            E = sharedPrefs.getFloat("pref_key_landscape_coefficient_e", 0.0f);
+            F = sharedPrefs.getFloat("pref_key_landscape_coefficient_f", 0.0f);
         }
+
+        zResistanceMin = sharedPrefs.getInt("pref_key_z_resistance_min", 0);
+        zResistanceMax = sharedPrefs.getInt("pref_key_z_resistance_max", 0);
 
         if (uInput == null) {
-            uInput = new NativeInput(screenTopLeftCoord, screenTopRightCoord, screenBottomRightCoord,
-                    maxSize.x, maxSize.y);
+            uInput = new NativeInput(A, B, C, D, E, F, zResistanceMin, zResistanceMax);
         }
         else {
-            uInput.setCoordinates(screenTopLeftCoord, screenTopRightCoord, screenBottomRightCoord,
-                    maxSize.x, maxSize.y);
+            uInput.setCoefficients(A, B, C, D, E, F, zResistanceMin, zResistanceMax);
         }
 
 
@@ -241,28 +229,45 @@ public class ArduinoCom implements Runnable{
     }
 
 
-    // TODO:  This needs its own thread
-    public void listenForInput() {
+	/**
+     * This function listens for input until the running loop is broken.  It is only
+     * called from the Objects run() function, which should never be called from
+     * the main thread, as it is blocking
+     */
+    private void listenForInput() {
 
         mRunning = true;
 
         int numBytes;
         byte[] buffer = new byte[256];  // Max line of 256
         while (mRunning) {
-
-            // TODO:  send command to NativeInput.  Should probably do it via message to
-            //        a handler in another thread
             try {
                 numBytes = arudinoInput.read(buffer);
+
+                // if a message was received, send it to the message handler
+                // for processing
+                if (numBytes > 0) {
+                    Message msg = mInputHandler.obtainMessage();
+                    msg.obj = buffer;
+                    msg.arg1 = numBytes;
+                    mInputHandler.sendMessage(msg);
+                }
+
             } catch(IOException e) {
                 // If the device is disconnected or we have a read error, break the loop
                 break;
             }
 
+            // TODO: Should I sleep here at all?
         }
 
     }
 
+	/**
+     * Sends data to the arduino for processing
+     * @param data
+     * @return
+     */
     public boolean writeData(String data) {
         byte[] bytes = data.getBytes();
 
@@ -280,14 +285,29 @@ public class ArduinoCom implements Runnable{
 	 *
      * @param message - the bytes to parse
      * @param numBytes - the number of bytes received in the message
-     * @param command - the command received from the bytes
-     * @param coordinates - the coordinates related to the command received
      */
-    private void parseBytes(byte[] message, int numBytes, String command, Point coordinates) {
+    private ArduinoMessage parseBytes(byte[] message, int numBytes) {
 
+        // Create string from byte array.  The bytes come in this format:
+        // <command:x:y:z>
+        // We ignore the opening and closing brackets when creating our string
+        String msg = new String(message, 1, numBytes - 2 );
+        String[] tokens = msg.split(":");
+
+        if (tokens.length != 4) {
+            Log.e(TAG, "Issue parsing string, invalid data recd");
+            return null;
+        }
+
+        ArduinoMessage ardMsg = new ArduinoMessage();
+        ardMsg.command = tokens[0];
+        ardMsg.point = new TouchPoint(Integer.parseInt(tokens[1]),
+                Integer.parseInt(tokens[2]), Integer.parseInt(tokens[3]));
+
+        return ardMsg;
     }
 
-    public void calibrate () {
+    public void calibrate (SharedPreferences sharedPrefs) {
 
         if (!mConnected) {
             return;
@@ -297,21 +317,17 @@ public class ArduinoCom implements Runnable{
 
         Intent calibrateIntent = new Intent(mContext, CalibrateTouchScreen.class);
         mContext.startActivity(calibrateIntent);
-        // TODO:  need to listen for calibration data from arduino
-        //        as the activity guides the user where to press.  After each press, we send an intent
-        //        to the calibration activity guiding the user where to press next until calibration
-        //        is complete, at which case we send an intent telling the activity to close itself
 
-        // Get the first three touch points
-
+        // Tell the Arduino to start Calibrate
+        writeData("<CAL_START>");
         int numBytes = 0;
         byte[] buffer = new byte[256];  // Max line of 256
 
-        // Get the top left point
+        // Get the right center
+        // TODO: need to get the bottom center and top left points as well. Then I need to calculate
+        //       the conversion coefficients and store them in sharedprefs
         while (numBytes == 0) {
 
-            // TODO:  send command to NativeInput.  Should probably do it via message to
-            //        a handler in another thread
             try {
                 numBytes = arudinoInput.read(buffer);
             } catch(IOException e) {
@@ -323,14 +339,113 @@ public class ArduinoCom implements Runnable{
             // an intent to the activity telling it to move to the next point
             if (numBytes > 0) {
 
+                // Tell the Arudino to go to the next point
+                writeData("<CAL_NEXT>");
+
+                try {
+                    Thread.sleep(1000);
+                } catch(InterruptedException e) {
+
+                }
             }
         }
 
-        // TODO: Top right point
+        // TODO: Get zMinResistance and zMaxResistance so it can be calibrated as well
 
-        // TODO: Bottom right point
+        // TODO: send points received to the calcCoefficients function
+
+        // Tell arduino to stop calibration (If we want to calibrate both Landscape and Portrait
+        // well send <CAL_CONTINUE>
+        writeData("<CAL_END>");
 
         // TODO: set isCalibrated to true in shared preferences
+
+    }
+
+	/**
+	 * Calculates Coefficients given screen coordinates
+     *
+     * @param touchP1   Right center point received from touchscreen
+     * @param touchP2   Bottom center point received from touchscreen
+     * @param touchP3   Top Left point received from touchscreen
+     */
+    private void calcCoefficients(SharedPreferences sharedPrefs,
+                                  Point touchP1, Point touchP2, Point touchP3) {
+
+        // Calibration coefficients
+        float A;
+        float B;
+        float C;
+        float D;
+        float E;
+        float F;
+
+        Point deviceP1;     // Right Center device coordinate
+        Point deviceP2;     // Bottom Center device coordinate
+        Point deviceP3;     // Top Left device coordinate
+
+        DisplayManager displayManager = (DisplayManager)mContext.getSystemService(Context.DISPLAY_SERVICE);
+        Display myDisplay = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
+
+        Point maxSize = new Point();
+        myDisplay.getRealSize(maxSize);
+
+        // Get 10% of each axis, as our touch points will be within those ranges
+        int xOffset = Math.round(0.1f * maxSize.x);
+        int yOffset = Math.round(0.1f * maxSize.y);
+
+        deviceP1 = new Point((maxSize.x - xOffset), (maxSize.y / 2));
+        deviceP2 = new Point((maxSize.x) / 2, (maxSize.y - yOffset));
+        deviceP3 = new Point(xOffset, yOffset);
+
+        // TODO: Verify math is correct
+
+        A = (deviceP1.x * (touchP2.y - touchP3.y)) + (deviceP2.x * (touchP3.y - touchP1.y))
+                + (deviceP3.x * (touchP1.y - touchP2.y));
+        A = A / (touchP1.x * (touchP2.y - touchP3.y) + (touchP2.x * (touchP3.y - touchP1.y))
+                + (touchP3.x * (touchP1.y - touchP2.y)));
+
+        B = (A * (touchP3.x - touchP2.x)) + deviceP2.x - deviceP3.x;
+        B = B / (touchP2.y - touchP3.y);
+
+        C = deviceP3.x - (A * touchP3.x) - (B * touchP3.y);
+
+        D = ((deviceP1.y * (touchP2.y - touchP3.y)) + (deviceP2.y * (touchP3.y - touchP1.y))
+                + (deviceP3.y * (touchP1.y - touchP2.y)));
+        D = D / ((touchP1.x * (touchP2.y - touchP3.y)) + (touchP2.x * (touchP3.y - touchP1.y))
+                + (touchP3.x * (touchP1.y - touchP2.y)));
+
+        E = ((D * (touchP3.x - touchP2.x)) + deviceP2.y - deviceP3.y);
+        E = E / (touchP2.y - touchP3.y);
+
+        F = deviceP3.y - (D * touchP3.x) - (E * touchP3.y);
+
+        int rotation = myDisplay.getRotation();
+
+        // Set coordinate coefficients based on rotation
+        if (rotation == Surface.ROTATION_0 || rotation == Surface.ROTATION_180) {
+            // Portrait
+
+            sharedPrefs.edit().putFloat("pref_key_portrait_coefficient_a", A)
+                    .putFloat("pref_key_portrait_coefficient_b", B)
+                    .putFloat("pref_key_portrait_coefficient_c", C)
+                    .putFloat("pref_key_portrait_coefficient_d", D)
+                    .putFloat("pref_key_portrait_coefficient_e", E)
+                    .putFloat("pref_key_portrait_coefficient_f", F)
+                    .apply();
+
+        }
+        else {
+            // Landscape
+
+            sharedPrefs.edit().putFloat("pref_key_landscape_coefficient_a", A)
+                    .putFloat("pref_key_landscape_coefficient_b", B)
+                    .putFloat("pref_key_landscape_coefficient_c", C)
+                    .putFloat("pref_key_landscape_coefficient_d", D)
+                    .putFloat("pref_key_landscape_coefficient_e", E)
+                    .putFloat("pref_key_landscape_coefficient_f", F)
+                    .apply();
+        }
 
     }
 
