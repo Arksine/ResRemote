@@ -13,22 +13,36 @@ public class ScreenOrientationEnforcer {
 	private final View view;
 	private final WindowManager windows;
 
+	boolean isEnforced;
+
 	public ScreenOrientationEnforcer(Context context) {
 		windows = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
 		view = new View(context);
+		isEnforced = false;
 	}
 
-	public void start() {
-		WindowManager.LayoutParams layout = generateLayout();
-		windows.addView(view, layout);
-		view.setVisibility(View.VISIBLE);
+	/**
+	 * Start enforcing a selected Orientation
+	 * @param orientation - should be equal to ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE or
+	 *                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+	 */
+	public void start(int orientation) {
+		if (!isEnforced) {
+			WindowManager.LayoutParams layout = generateLayout(orientation);
+			windows.addView(view, layout);
+			view.setVisibility(View.VISIBLE);
+			isEnforced = true;
+		}
 	}
 
 	public void stop() {
-		windows.removeView(view);
+		if (isEnforced) {
+			windows.removeView(view);
+			isEnforced = false;
+		}
 	}
 
-	private WindowManager.LayoutParams generateLayout() {
+	private WindowManager.LayoutParams generateLayout(int orientation) {
 		WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams();
 
 		//So we don't need a permission or activity
@@ -50,7 +64,7 @@ public class ScreenOrientationEnforcer {
 		layoutParams.alpha = 0f;
 
 		//The orientation to force
-		layoutParams.screenOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
+		layoutParams.screenOrientation = orientation;
 
 		return layoutParams;
 	}

@@ -1,7 +1,9 @@
 package com.arksine.resremote;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Point;
 import android.hardware.display.DisplayManager;
@@ -11,8 +13,10 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Process;
 import android.preference.PreferenceManager;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.view.Display;
+import android.view.OrientationEventListener;
 import android.view.Surface;
 import android.widget.Toast;
 
@@ -31,7 +35,7 @@ import java.io.OutputStream;
  */
 public class ArduinoCom implements Runnable{
 
-    private static String TAG = "ArduinoCom";
+    private static final String TAG = "ArduinoCom";
 
     private NativeInput uInput = null;
     private boolean mConnected = false;
@@ -67,10 +71,23 @@ public class ArduinoCom implements Runnable{
         listenForInput();
     }
 
-// TODO:  Need a broadcast reciever to listen for changes to the rotation so
-    //        the uInput coordinates can be updated
+    // Event listener to detect changes in orientation
+    private OrientationEventListener orientationListener;
 
-    // TODO: Need a broadcast reciever to listen for write commands.
+    // Broadcast reciever to listen for write commands.
+    public class WriteReciever extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (mContext.getString(R.string.ACTION_SEND_DATA).equals(action)) {
+                // stops all queued services
+                String data = intent.getStringExtra(mContext.getString(R.string.EXTRA_DATA));
+                writeData(data);
+            }
+        }
+    }
+    private final WriteReciever writeReciever = new WriteReciever();
+    boolean isWriteReceiverRegistered = false;
 
     private class ArduinoMessage {
         public String command;
@@ -85,7 +102,7 @@ public class ArduinoCom implements Runnable{
         thread.start();
         mInputLooper = thread.getLooper();
         mInputHandler = new InputHandler(mInputLooper);
-        SharedPreferences sharedPrefs =
+        final SharedPreferences sharedPrefs =
                 PreferenceManager.getDefaultSharedPreferences(mContext);
 
         mConnected = connect(sharedPrefs);
@@ -100,15 +117,25 @@ public class ArduinoCom implements Runnable{
             return;
         }
 
-        // Tell the Arudino that it is time to start
-        String start = "<START>";
-        if (!writeData(start)) {
-            // unable to write start command
-            mConnected = false;
-            return;
+        // Determine if the screen is calibrated
+        String orientation = sharedPrefs.getString("pref_key_select_orientation", "Landscape");
+        boolean isCalibrated;
+        switch (orientation) {
+            case "Landscape":
+                isCalibrated = sharedPrefs.getBoolean("pref_key_is_landscape_calibrated", false);
+                break;
+            case "Portrait":
+                isCalibrated = sharedPrefs.getBoolean("pref_key_is_portrait_calibrated", false);
+                break;
+            case "Dynamic":
+                isCalibrated = (sharedPrefs.getBoolean("pref_key_is_landscape_calibrated", false) &&
+                        sharedPrefs.getBoolean("pref_key_is_portrait_calibrated", false));
+                break;
+            default:
+                Log.e(TAG, "Invalid orientation selected");
+                mConnected = false;
+                return;
         }
-
-        boolean isCalibrated = sharedPrefs.getBoolean("pref_key_iscalibrated", false);
 
         if (!isCalibrated) {
             Log.i(TAG, "Touch Screen not calibrated, ");
@@ -119,7 +146,37 @@ public class ArduinoCom implements Runnable{
             calibrate(sharedPrefs);
         }
 
-        getInputSettings(sharedPrefs);
+        // Tell the Arudino that it is time to start
+        String start = "<START>";
+        if (!writeData(start)) {
+            // unable to write start command
+            mConnected = false;
+            return;
+        }
+
+        setCoefficients(sharedPrefs);
+
+        // Set up the orientation listener
+        orientationListener = new OrientationEventListener(mContext) {
+            @Override
+            public void onOrientationChanged(int orientation) {
+                setCoefficients(PreferenceManager.getDefaultSharedPreferences(mContext));
+            }
+        };
+
+        // Only enable the orientationListener if we are allowing dynamic orientation
+        if (orientation.equals("Dynamic")) {
+            orientationListener.enable();
+        }
+        else {
+            orientationListener.disable();
+        }
+
+        //Register write data receiver
+        IntentFilter sendDataFilter = new IntentFilter(mContext.getString(R.string.ACTION_SEND_DATA));
+        mContext.registerReceiver(writeReciever, sendDataFilter);
+        isWriteReceiverRegistered = true;
+
     }
 
     @Override
@@ -135,9 +192,8 @@ public class ArduinoCom implements Runnable{
         if (macAddr.equals("NO_DEVICE")){
             return false;
         }
-        // TODO:  I should probably request the socket in another thread, wait here for
-        //        a specific period of time, and after the timeout call the cancel function
 
+        // Request a socket in another thread so we can timeout after one second
         Runnable requestBtSocket = new Runnable() {
             @Override
             public void run() {
@@ -161,15 +217,11 @@ public class ArduinoCom implements Runnable{
         }
 
 
-        if (!btManager.isDeviceConnected()) {
-           return false;
-        }
+        return btManager.isDeviceConnected();
 
-        return true;
     }
 
-    // TODO: change name to setScreenCoefficents?
-    private void getInputSettings(SharedPreferences sharedPrefs) {
+    private void setCoefficients(SharedPreferences sharedPrefs) {
 
         // Calibration coefficients
         float A;
@@ -223,11 +275,8 @@ public class ArduinoCom implements Runnable{
     }
 
     public boolean isConnected() {
-
-        // TODO: Check to see if the bluetooth connection is still established here;
         return mConnected;
     }
-
 
 	/**
      * This function listens for input until the running loop is broken.  It is only
@@ -242,31 +291,32 @@ public class ArduinoCom implements Runnable{
         byte[] buffer = new byte[256];  // Max line of 256
         while (mRunning) {
             try {
+
+                // blocks until bytes are read
                 numBytes = arudinoInput.read(buffer);
 
                 // if a message was received, send it to the message handler
                 // for processing
-                if (numBytes > 0) {
-                    Message msg = mInputHandler.obtainMessage();
-                    msg.obj = buffer;
-                    msg.arg1 = numBytes;
-                    mInputHandler.sendMessage(msg);
-                }
+
+                Message msg = mInputHandler.obtainMessage();
+                msg.obj = buffer;
+                msg.arg1 = numBytes;
+                mInputHandler.sendMessage(msg);
+
 
             } catch(IOException e) {
                 // If the device is disconnected or we have a read error, break the loop
                 break;
             }
 
-            // TODO: Should I sleep here at all?
         }
 
     }
 
 	/**
      * Sends data to the arduino for processing
-     * @param data
-     * @return
+     * @param data  Data to write to the arduino
+     * @return  true is successful, false otherwise
      */
     public boolean writeData(String data) {
         byte[] bytes = data.getBytes();
@@ -309,6 +359,9 @@ public class ArduinoCom implements Runnable{
 
     public void calibrate (SharedPreferences sharedPrefs) {
 
+        LocalBroadcastManager localBroadcast = LocalBroadcastManager.getInstance(mContext);
+        Point[] touchPoints;
+
         if (!mConnected) {
             return;
         }
@@ -318,47 +371,225 @@ public class ArduinoCom implements Runnable{
         Intent calibrateIntent = new Intent(mContext, CalibrateTouchScreen.class);
         mContext.startActivity(calibrateIntent);
 
-        // Tell the Arduino to start Calibrate
-        writeData("<CAL_START>");
-        int numBytes = 0;
-        byte[] buffer = new byte[256];  // Max line of 256
+        String orientation = sharedPrefs.getString("pref_key_select_orientation", "Landscape");
+        // If the orientation is dynamic, we need run through the orientation twice
+        if (orientation.equals("Dynamic")) {
+            // Get Landscape touchpoints
+            calibrateIntent = new Intent(mContext.getString(R.string.ACTION_CALIBRATE_START));
+            calibrateIntent.setClass(mContext, CalibrateTouchScreen.CalibrateReceiver.class);
+            calibrateIntent.putExtra("orientation", "Landscape");
+            localBroadcast.sendBroadcastSync(calibrateIntent);
+            touchPoints = getTouchPoints(localBroadcast);
+            if (touchPoints == null) {
+                return;
+            }
+            calcCoefficients(sharedPrefs, touchPoints[0], touchPoints[1], touchPoints[2]);
 
-        // Get the right center
-        // TODO: need to get the bottom center and top left points as well. Then I need to calculate
-        //       the conversion coefficients and store them in sharedprefs
-        while (numBytes == 0) {
+            // Get portrait touchpoints
+            calibrateIntent = new Intent(mContext.getString(R.string.ACTION_CALIBRATE_START));
+            calibrateIntent.setClass(mContext, CalibrateTouchScreen.CalibrateReceiver.class);
+            calibrateIntent.putExtra("orientation", "Portrait");
+            localBroadcast.sendBroadcastSync(calibrateIntent);
+            touchPoints = getTouchPoints(localBroadcast);
+            if (touchPoints == null) {
+                return;
+            }
+            calcCoefficients(sharedPrefs, touchPoints[0], touchPoints[1], touchPoints[2]);
+
+        }
+        else {
+
+            // Rotation is locked, so this will work for both Portrait and Landscape
+            calibrateIntent = new Intent(mContext.getString(R.string.ACTION_CALIBRATE_START));
+            calibrateIntent.setClass(mContext, CalibrateTouchScreen.CalibrateReceiver.class);
+            localBroadcast.sendBroadcastSync(calibrateIntent);
+            touchPoints = getTouchPoints(localBroadcast);
+            if (touchPoints == null) {
+                return;
+            }
+            calcCoefficients(sharedPrefs, touchPoints[0], touchPoints[1], touchPoints[2]);
+
+        }
+
+        calcResistance(localBroadcast, sharedPrefs);
+
+        // Tell arduino to stop calibration,
+        // TODO: not sure I need this, the ardino will be looking for the start command which
+        // should break the setup function
+        writeData("<CAL_END>");
+
+        // broadcast an intent to the calibration activity telling it to end
+        calibrateIntent = new Intent(mContext.getString(R.string.ACTION_CALIBRATE_END));
+        calibrateIntent.setClass(mContext, CalibrateTouchScreen.CalibrateReceiver.class);
+        localBroadcast.sendBroadcast(calibrateIntent);
+
+        // Set ix_x_calibrated to true
+        switch (orientation) {
+            case "Landscape":
+                sharedPrefs.edit().putBoolean("pref_key_is_landscape_calibrated", true).apply();
+                break;
+            case "Portrait":
+                sharedPrefs.edit().putBoolean("pref_key_is_portrait_calibrated", true).apply();
+                break;
+            case "Dynamic":
+                sharedPrefs.edit().putBoolean("pref_key_is_landscape_calibrated", true)
+                        .putBoolean("pref_key_is_portrait_calibrated", true)
+                        .apply();
+                break;
+            default:
+                // Invalid orientation selection
+                Log.e(TAG, "Invalid Orientation selected");
+                break;
+        }
+
+    }
+
+    private Point[] getTouchPoints(LocalBroadcastManager localBroadcast) {
+
+        Point[] touchPoints = new Point[3];
+        int numBytes;
+        byte[] buffer = new byte[256]; // Max line size of 256
+        ArduinoMessage screenPt;
+        Intent calIntent;
+
+        // Get the three calibration touch points
+        for (int i = 0; i < 3; i++) {
+
+            // Tell the Arudino to recieve a single point
+            writeData("<CAL_POINT>");
 
             try {
                 numBytes = arudinoInput.read(buffer);
-            } catch(IOException e) {
-                // If the device is disconnected or we have a read error, break the loop
-                break;
-            }
 
-            // parse the bytes for x and y values, add them to shared preferences, and broadcast
-            // an intent to the activity telling it to move to the next point
-            if (numBytes > 0) {
-
-                // Tell the Arudino to go to the next point
-                writeData("<CAL_NEXT>");
-
-                try {
-                    Thread.sleep(1000);
-                } catch(InterruptedException e) {
-
+                screenPt = parseBytes(buffer, numBytes);
+                if (screenPt == null){
+                    // Error parsing bytes
+                    Log.e(TAG, "Error Parsing Calibration data from arduino");
+                    return null;
                 }
+                touchPoints[i] = new Point(screenPt.point.getX(), screenPt.point.getY());
+
+            } catch (IOException e) {
+                // If the device is disconnected or we have a read error, break the loop
+                return null;
             }
+
+            // Since we are telling the activity to move to the next point, we don't need
+            // to move past index 2 (which is the third point)
+            if (i < 2) {
+
+                calIntent = new Intent(mContext.getString(R.string.ACTION_CALIBRATE_NEXT));
+                calIntent.setClass(mContext, CalibrateTouchScreen.CalibrateReceiver.class);
+                // send an index to the next point
+                calIntent.putExtra("point_index", (i + 1));
+                localBroadcast.sendBroadcastSync(calIntent);
+            }
+
+            // Sleep for one second so the UI has time to animate to the next point
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) { }
+
+        }
+        return touchPoints;
+    }
+
+	/**
+	 *  Reads Z-resistance min and max from arduino
+     */
+    private class ReadResistanceRunnable implements Runnable {
+        private volatile boolean isRunning = true;
+
+        private int resistanceMin = 0xFFFFFFFF;
+        private int resistanceMax = 0;
+
+        public int getResistanceMin() {
+            return resistanceMin;
         }
 
-        // TODO: Get zMinResistance and zMaxResistance so it can be calibrated as well
+        public int getResistanceMax() {
+            return resistanceMax;
+        }
 
-        // TODO: send points received to the calcCoefficients function
+        public void stopRunning() {
+            isRunning = false;
+        }
 
-        // Tell arduino to stop calibration (If we want to calibrate both Landscape and Portrait
-        // well send <CAL_CONTINUE>
-        writeData("<CAL_END>");
+        @Override
+        public void run() {
+            isRunning = true;
 
-        // TODO: set isCalibrated to true in shared preferences
+            int numBytes;
+            byte[] buffer = new byte[256];
+            ArduinoMessage screenPt;
+
+            writeData("<CAL_PRESSURE>");
+            while (isRunning) {
+
+                try {
+                    numBytes = arudinoInput.read(buffer);
+
+                    screenPt = parseBytes(buffer, numBytes);
+                    if (screenPt == null){
+                        // Error parsing bytes
+                        Log.e(TAG, "Error Parsing Calibration data from arduino");
+                        break;
+                    }
+                    // We'll receive a stop command from the arduino after the user has
+                    // lifted their finger
+                    if (screenPt.command.equals("<STOP>")){
+                        isRunning = false;
+                        break;
+                    }
+
+                    if (screenPt.point.getZ() < resistanceMin) {
+                        resistanceMin = screenPt.point.getZ();
+                    }
+                    if (screenPt.point.getZ() > resistanceMax) {
+                        resistanceMax = screenPt.point.getZ();
+                    }
+
+                } catch (IOException e) {
+                    // If the device is disconnected or we have a read error, break the loop
+                    break;
+                }
+            }
+
+        }
+    }
+
+    private void calcResistance(LocalBroadcastManager localBroadcast,
+                                SharedPreferences sharedPrefs) {
+
+        // We are going to read pressure in another thread so we can set
+        // a timeout
+        final ReadResistanceRunnable readResistance = new ReadResistanceRunnable();
+        Thread readResistanceThread = new Thread(readResistance);
+
+        // Tell the calibration activity to start receiving pressure
+        Intent calIntent = new Intent(mContext.getString(R.string.ACTON_CALIBRATE_PRESSURE));
+        calIntent.setClass(mContext, CalibrateTouchScreen.CalibrateReceiver.class);
+        localBroadcast.sendBroadcastSync(calIntent);
+
+        // Start the thread
+        readResistanceThread.start();
+
+        // give a 10 second timeout
+        try {
+            readResistanceThread.join(10000);
+        }
+        catch (InterruptedException e) {}
+
+        // kill the thread if its still alive
+        if (readResistanceThread.isAlive())
+        {
+            readResistance.stopRunning();
+            // TODO: should probably tell the activity that the request to get pressure timed out
+        }
+
+        sharedPrefs.edit().putInt("pref_key_z_resistance_min", readResistance.getResistanceMin())
+                .putInt("pref_key_z_resistance_max", readResistance.getResistanceMax())
+                .apply();
 
     }
 
@@ -457,14 +688,17 @@ public class ArduinoCom implements Runnable{
             btManager = null;
         }
 
-        // TODO: unregister receivers here if they are registered
+        if (isWriteReceiverRegistered) {
+            mContext.unregisterReceiver(writeReciever);
+            isWriteReceiverRegistered = false;
+        }
     }
 
     /**
      * Stops the loop in the run() command
      */
     public void stop() {
-        // TODO:  should I write a stop command here to the arduino here?
+
         mRunning = false;
     }
 

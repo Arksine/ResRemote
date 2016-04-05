@@ -7,22 +7,19 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.Process;
+import android.preference.PreferenceManager;
 import android.util.Log;
-import android.widget.Toast;
 
 /**
  * TODO: 3/28/2016
- * The service below needs to be launched in the foreground.  We will need an activity to
- * set up any options we require and calibrate the touchscreen.  We will need a class that
- * handles Bluetooth communication with the Arudino that implements a runnable and runs in another
- * thread.  We will also need a class that takes the input recieved from the arduino and calls the
- * native uinput libraries.
  *
  * Right now the minimum api required is api-19, but I may need to change tha to api 21 as I don't
  * believe uinput.h is in the ndk for api-19.
@@ -32,7 +29,9 @@ import android.widget.Toast;
 public class ResRemoteService extends Service {
 
     private static String TAG = "ResRemoteService";
+
     private ArduinoCom arduino = null;
+    private ScreenOrientationEnforcer landscapeEnforcer = null;
 
     public class StopReciever extends BroadcastReceiver {
         public StopReciever() {
@@ -91,6 +90,8 @@ public class ResRemoteService extends Service {
         mServiceLooper = thread.getLooper();
         mServiceHandler = new ServiceHandler(mServiceLooper);
 
+        landscapeEnforcer = new ScreenOrientationEnforcer(this);
+
         // The code below registers a receiver that allows us
         // to stop the service through an action shown on the notification.
         IntentFilter filter = new IntentFilter(getString(R.string.ACTION_STOP_SERVICE));
@@ -98,7 +99,7 @@ public class ResRemoteService extends Service {
 
         //TODO:  Need to make sure that adding .setClass works for the broadcast reciever
         Intent stopIntent = new Intent(getString(R.string.ACTION_STOP_SERVICE))
-                .setClass(getApplicationContext(), ResRemoteService.StopReciever.class);
+                .setClass(this, ResRemoteService.StopReciever.class);
         PendingIntent stopPendingIntent = PendingIntent.getBroadcast(this, R.integer.REQUEST_STOP_SERVICE,
                 stopIntent, 0);
 
@@ -123,6 +124,26 @@ public class ResRemoteService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+
+
+        // Force a specific orientation  if it is set in shared preferences
+        SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String orientation = sharedPrefs.getString("pref_key_select_orientation", "Landscape");
+        switch (orientation) {
+            case "Landscape":
+                landscapeEnforcer.start(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                break;
+            case "Portrait":
+                landscapeEnforcer.start(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                break;
+            case "Dynamic":
+                landscapeEnforcer.stop();
+                break;
+            default:
+                Log.e(TAG, "Invalid orientation selected");
+                landscapeEnforcer.stop();
+                break;
+        }
 
         // Stop the current thread if its running, so we can launch a new one (perhaps to calibrate)
         if (arduino != null) {
@@ -153,5 +174,10 @@ public class ResRemoteService extends Service {
         if (arduino != null) {
             arduino.disconnect();
         }
+
+        if (landscapeEnforcer != null) {
+            landscapeEnforcer.stop();
+        }
+
     }
 }

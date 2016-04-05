@@ -5,4 +5,7 @@
     <integer name="ONGOING_NOTIFICATION_ID">6002</integer>
     <integer name="REQUEST_STOP_SERVICE">6003</integer>
     <integer name="REQUEST_START_RESREMOTE_ACTIVITY">6004</integer>
+
+    <!-- Integers used for preferences -->
+
 </resources>

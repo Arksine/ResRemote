@@ -5,7 +5,12 @@
 
     <string name="ACTION_STOP_SERVICE">com.arksine.resremote.ACTION_STOP_SERVICE</string>
     <string name="ACTION_SEND_DATA">com.arksine.resremote.ACTION_SEND_DATA</string>
+    <string name="EXTRA_DATA">com.arksine.resremote.EXTRA_DATA</string>
+    <string name="ACTION_CALIBRATE_START">com.arksine.resremote.ACTION_CALIBRATE_START</string>
     <string name="ACTION_CALIBRATE_NEXT">com.arksine.resremote.ACTION_CALIBRATE_NEXT</string>
+    <string name="ACTON_CALIBRATE_PRESSURE">com.arksine.resremote.ACTION_CALIBRATE_PRESSURE</string>
+    <string name="ACTION_CALIBRATE_END">com.arksine.resremote.ACTION_CALIBRATE_END</string>
+    <string name="ACTION_PRESSURE_RECEIVED">com.arksine.resremote.ACTION_PRESSURE_RECEIVED</string>
 
     <!-- Strings related to Settings -->
 
@@ -21,10 +26,32 @@
 
     <string name="pref_start_service">Start Service</string>
     <string name="pref_stop_service">Stop Service</string>
-    <string name="pref_allow_portrait">Allow Portrait Mode</string>
-    <string name="pref_allow_portrait_summary">Requires Calibration of both Orientations</string>
+
+    <string name="pref_select_orientation">Select Orientation</string>
+    <string-array name="pref_select_orientation_entries">
+        <item>Landscape</item>
+        <item>Portrait</item>
+        <item>Dynamic</item>
+    </string-array>
+    <string-array name="pref_select_orientation_values">
+        <item>Landscape</item>
+        <item>Portrait</item>
+        <item>Dynamic</item>
+    </string-array>
+
+
+    <string name="pref_force_landscape">Force Landscape Orientation</string>
+    <string name="pref_force_landscape_summary">
+        Requires Calibration of both Orientations when disabled</string>
+
     <string name="pref_calibrate">Calibrate Touch Screen</string>
 
     <string name="title_activity_calibrate_touch_screen">CalibrateTouchScreen</string>
+
+    <!-- Showcaseview strings-->
+    <string name="cal_title">Touch Screen Calibration</string>
+    <string name="cal_text">Please touch the indicated point</string>
+    <string name="cal_pressure_title">Pressure Calibration</string>
+    <string name="cal_pressure_text">Touch the screen, slowly increasing pressure</string>
 
 </resources>

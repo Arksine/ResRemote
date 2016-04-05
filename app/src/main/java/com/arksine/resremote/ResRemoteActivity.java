@@ -62,8 +62,6 @@ public class ResRemoteActivity extends Activity {
 
     public static class SettingsFragment extends PreferenceFragment {
 
-        // TODO:  Need to add option to calibrate both landscape and portrait, or just force landscape?
-
         @Override
         public void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
@@ -76,8 +74,10 @@ public class ResRemoteActivity extends Activity {
             PreferenceScreen startService = (PreferenceScreen) root.findPreference("pref_key_start_service");
             PreferenceScreen stopService = (PreferenceScreen) root.findPreference("pref_key_stop_service");
             ListPreference selectDevice = (ListPreference) root.findPreference("pref_key_select_bt_device");
+            ListPreference selectOrientation = (ListPreference) root.findPreference("pref_key_select_orientation");
 
             selectDevice.setSummary(selectDevice.getEntry());
+            selectOrientation.setSummary(selectOrientation.getEntry());
 
             ArrayList<String> mAdapterList = btManager.enumerateDevices();
             populateDeviceListView(mAdapterList, selectDevice);
@@ -85,12 +85,21 @@ public class ResRemoteActivity extends Activity {
             selectDevice.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
                 @Override
                 public boolean onPreferenceChange(Preference preference, Object newValue) {
-
                     ListPreference list = (ListPreference)preference;
                     CharSequence[] entries = list.getEntries();
                     int index = list.findIndexOfValue((String)newValue);
                     preference.setSummary(entries[index]);
+                    return true;
+                }
+            });
 
+            selectOrientation.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(Preference preference, Object newValue) {
+                    ListPreference list = (ListPreference)preference;
+                    CharSequence[] entries = list.getEntries();
+                    int index = list.findIndexOfValue((String)newValue);
+                    preference.setSummary(entries[index]);
                     return true;
                 }
             });
@@ -98,7 +107,6 @@ public class ResRemoteActivity extends Activity {
             startService.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
                 @Override
                 public boolean onPreferenceClick(Preference preference) {
-
                     Context mContext = getActivity();
                     Intent startIntent = new Intent(mContext, ResRemoteService.class);
                     mContext.startService(startIntent);
@@ -109,12 +117,10 @@ public class ResRemoteActivity extends Activity {
             stopService.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
                 @Override
                 public boolean onPreferenceClick(Preference preference) {
-
-                    Context mContext = getActivity().getApplicationContext();
+                    Context mContext = getActivity();
                     Intent stopIntent = new Intent(getString(R.string.ACTION_STOP_SERVICE))
                             .setClass(mContext, ResRemoteService.StopReciever.class );
                     mContext.sendBroadcast(stopIntent);
-
                     return true;
                 }
             });
@@ -129,11 +135,28 @@ public class ResRemoteActivity extends Activity {
                     Context mContext = getActivity();
                     SharedPreferences sharedPrefs =
                             PreferenceManager.getDefaultSharedPreferences(mContext);
-                    sharedPrefs.edit().putBoolean("pref_key_isCalibrated", false).apply();
+
+                    // set the is_x_calibrated preference to false, depending on orientation
+                    String orientation = sharedPrefs.getString("pref_key_select_orientation", "Landscape");
+                    switch (orientation) {
+                        case "Landscape":
+                            sharedPrefs.edit().putBoolean("pref_key_is_landscape_calibrated", false).apply();
+                            break;
+                        case "Portrait":
+                            sharedPrefs.edit().putBoolean("pref_key_is_portrait_calibrated", false).apply();
+                            break;
+                        case "Dynamic":
+                            sharedPrefs.edit().putBoolean("pref_key_is_landscape_calibrated", false).apply();
+                            sharedPrefs.edit().putBoolean("pref_key_is_portrait_calibrated", false).apply();
+                            break;
+                        default:
+                            // Error: invalid orientation
+                            Log.e(TAG, "Invalid orientation selected");
+                            break;
+                    }
 
                     Intent startIntent = new Intent(mContext, ResRemoteService.class);
                     mContext.startService(startIntent);
-
                     return true;
                 }
             });
