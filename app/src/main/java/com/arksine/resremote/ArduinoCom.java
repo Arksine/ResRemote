@@ -61,8 +61,7 @@ public class ArduinoCom implements Runnable{
         @Override
         public void handleMessage(Message msg) {
             ArduinoMessage message = parseBytes((byte[])msg.obj, msg.arg1);
-
-            // TODO: send screen input to the NativeInput class here
+            uInput.processInput(message.command, message.point);
         }
     }
 
@@ -413,10 +412,6 @@ public class ArduinoCom implements Runnable{
 
         calcResistance(localBroadcast, sharedPrefs);
 
-        // Tell arduino to stop calibration,
-        // TODO: not sure I need this, the ardino will be looking for the start command which
-        // should break the setup function
-        writeData("<CAL_END>");
 
         // broadcast an intent to the calibration activity telling it to end
         calibrateIntent = new Intent(mContext.getString(R.string.ACTION_CALIBRATE_END));
@@ -586,6 +581,8 @@ public class ArduinoCom implements Runnable{
             readResistance.stopRunning();
             // TODO: should probably tell the activity that the request to get pressure timed out
         }
+
+        writeData("<CAL_PRESSURE_END>");
 
         sharedPrefs.edit().putInt("pref_key_z_resistance_min", readResistance.getResistanceMin())
                 .putInt("pref_key_z_resistance_max", readResistance.getResistanceMax())

@@ -33,9 +33,6 @@ public class BluetoothManager {
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothSocket mSocket;
 
-    // TODO: this is for retrieving a bluetooth socket also need a name.  Use the insecure
-    //      method to retrieve the socket, as I don't want to prompt the user.
-    private final String NAME = "ResRemote";
     private final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
     private boolean isBtRecrRegistered = false;

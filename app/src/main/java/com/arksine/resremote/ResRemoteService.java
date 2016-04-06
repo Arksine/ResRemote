@@ -19,13 +19,9 @@ import android.preference.PreferenceManager;
 import android.util.Log;
 
 /**
- * TODO: 3/28/2016
- *
- * Right now the minimum api required is api-19, but I may need to change tha to api 21 as I don't
- * believe uinput.h is in the ndk for api-19.
+ * Service that listens for events from a resistive touchscreen connected to an arduino,
+ * translating them to android device input events
  */
-
-
 public class ResRemoteService extends Service {
 
     private static String TAG = "ResRemoteService";

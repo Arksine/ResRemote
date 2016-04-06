@@ -3,7 +3,6 @@ package com.arksine.resremote;
 import android.annotation.SuppressLint;
 import android.app.ActionBar;
 import android.app.Activity;
-import android.app.Notification;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -22,12 +21,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.preference.PreferenceManager;
 import android.support.v4.content.LocalBroadcastManager;
-import android.util.Log;
 import android.view.Display;
-import android.view.MotionEvent;
 import android.view.View;
 
-import com.github.amlcurran.showcaseview.MaterialShowcaseDrawer;
 import com.github.amlcurran.showcaseview.ShowcaseDrawer;
 import com.github.amlcurran.showcaseview.ShowcaseView;
 import com.github.amlcurran.showcaseview.targets.PointTarget;
@@ -51,7 +47,6 @@ public class CalibrateTouchScreen extends Activity {
 
     private Point[] devicePoints;       // Array containing the location of each device point to show
     private int shapeSize;              // Size of the shapes to draw on the view
-    private int pointsCalibrated = 0;   // number of points calibrated so far;
     private String orientationPref;     // the orientation requested in shared preferences
 
     ShowcaseView showcase;
@@ -138,6 +133,10 @@ public class CalibrateTouchScreen extends Activity {
                     showcase.setContentText(getString(R.string.cal_pressure_text));
                     break;
                 case ACTION_CALIBRATE_END:
+                    // TODO: Showcase "Finished" text here, then make the exitActivity
+                    //       function a runnable and launch it with a handler, post delayed
+                    //       by 3 seconds (or show a button that can be touched to exit
+                    //       the activity
                     exitActivity();
                     break;
             }
@@ -242,7 +241,7 @@ public class CalibrateTouchScreen extends Activity {
      * however it accepts a custom radius.  I need to be able to set the radius dynamically
      * as it is always a percentage of the screen.  DP doesn't do that.
      */
-    public class CalShowcaseDrawer implements ShowcaseDrawer {
+    private class CalShowcaseDrawer implements ShowcaseDrawer {
 
         private final float radius;
         private final Paint basicPaint;
@@ -301,7 +300,6 @@ public class CalibrateTouchScreen extends Activity {
         }
 
 
-    };
-
+    }
 
 }

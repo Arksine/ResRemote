@@ -76,7 +76,7 @@ public class NativeInput {
         pressureCoef = 256 / (zResistanceMax - zResistanceMin);
     }
 
-    public void processInput(TouchPoint screenCoord) {
+    public void processInput(String command, TouchPoint screenCoord) {
 
         TouchPoint deviceCoord = getDeviceCoord(screenCoord);
 
