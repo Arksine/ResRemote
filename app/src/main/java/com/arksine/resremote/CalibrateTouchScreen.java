@@ -56,7 +56,7 @@ public class CalibrateTouchScreen extends Activity {
      * and a change of the status and navigation bar.
      */
     private static final int UI_ANIMATION_DELAY = 300;
-    private final Handler mHideHandler = new Handler();
+    private final Handler eventHandler = new Handler();
     private CalibrationView calView;
     private final Runnable mHidePart2Runnable = new Runnable() {
         @SuppressLint("InlinedApi")
@@ -76,22 +76,19 @@ public class CalibrateTouchScreen extends Activity {
         }
     };
 
-    private final Runnable mShowPart2Runnable = new Runnable() {
-        @Override
-        public void run() {
-            // Delayed display of UI elements
-            ActionBar actionBar = getActionBar();
-            if (actionBar != null) {
-                actionBar.show();
-            }
 
-        }
-    };
 
     private final Runnable mHideRunnable = new Runnable() {
         @Override
         public void run() {
             hide();
+        }
+    };
+
+    private final Runnable exitActivityRunnable = new Runnable() {
+        @Override
+        public void run() {
+            exitActivity();
         }
     };
 
@@ -133,11 +130,10 @@ public class CalibrateTouchScreen extends Activity {
                     showcase.setContentText(getString(R.string.cal_pressure_text));
                     break;
                 case ACTION_CALIBRATE_END:
-                    // TODO: Showcase "Finished" text here, then make the exitActivity
-                    //       function a runnable and launch it with a handler, post delayed
-                    //       by 3 seconds (or show a button that can be touched to exit
-                    //       the activity
-                    exitActivity();
+                    showcase.setContentTitle(getString(R.string.cal_finshed_title));
+                    showcase.setContentText(getString(R.string.cal_finished_text));
+                    // Exit the activity in 3 seconds
+                    eventHandler.postDelayed(exitActivityRunnable, 3000);
                     break;
             }
 
@@ -156,7 +152,7 @@ public class CalibrateTouchScreen extends Activity {
 
         localBroadcast = LocalBroadcastManager.getInstance(this);
 
-        mHideHandler.post(mHideRunnable);
+        eventHandler.post(mHideRunnable);
 
         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
         orientationPref = sharedPrefs.getString("pref_key_select_orientation", "Landscape");
@@ -170,6 +166,7 @@ public class CalibrateTouchScreen extends Activity {
                 .setContentText(R.string.cal_text)
                 .blockAllTouches()
                 .build();
+        showcase.hideButton();
 
         // register receiver
         IntentFilter filter = new IntentFilter(getString(R.string.ACTION_CALIBRATE_START));
@@ -198,10 +195,13 @@ public class CalibrateTouchScreen extends Activity {
         Point maxSize = new Point();
         myDisplay.getRealSize(maxSize);
 
+        int xSize = Math.round(0.1f * maxSize.x);
+        int ySize = Math.round(0.1f * maxSize.y);
+
         // Shapesize is 10% of the screenwidth or height, whichever is the smallest
-        shapeSize = maxSize.x / 10;
-        if ((maxSize.y / 10) < shapeSize) {
-            shapeSize = maxSize.y / 10;
+        shapeSize = xSize;
+        if (ySize < shapeSize) {
+            shapeSize = ySize;
         }
     }
 
@@ -214,12 +214,15 @@ public class CalibrateTouchScreen extends Activity {
         myDisplay.getRealSize(maxSize);
 
         // Get 10% of each axis, as our touch points will be within those ranges
-        int xOffset = maxSize.x / 10;
-        int yOffset = maxSize.y / 10;
+        int xOffset = Math.round(0.1f * maxSize.x);
+        int yOffset = Math.round(0.1f * maxSize.y);
 
-        devicePoints[0] = new Point((maxSize.x - xOffset), (maxSize.y / 2));
-        devicePoints[1] = new Point((maxSize.x) / 2, (maxSize.y - yOffset));
-        devicePoints[2] = new Point(xOffset, yOffset);
+        // Points are zero indexed, so we always subtract 1 pixel
+        devicePoints[0] = new Point(((maxSize.x - xOffset) - 1),
+                ((maxSize.y / 2) - 1));
+        devicePoints[1] = new Point(((maxSize.x / 2) - 1),
+                ((maxSize.y - yOffset) - 1));
+        devicePoints[2] = new Point((xOffset - 1), (yOffset - 1));
 
     }
 
@@ -232,8 +235,7 @@ public class CalibrateTouchScreen extends Activity {
         }
 
         // Schedule a runnable to remove the status and navigation bar after a delay
-        mHideHandler.removeCallbacks(mShowPart2Runnable);
-        mHideHandler.postDelayed(mHidePart2Runnable, UI_ANIMATION_DELAY);
+        eventHandler.postDelayed(mHidePart2Runnable, UI_ANIMATION_DELAY);
     }
 
 	/**

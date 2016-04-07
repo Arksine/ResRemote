@@ -53,5 +53,7 @@
     <string name="cal_text">Please touch the indicated point</string>
     <string name="cal_pressure_title">Pressure Calibration</string>
     <string name="cal_pressure_text">Touch the screen, slowly increasing pressure</string>
+    <string name="cal_finshed_title">Calibration Complete!</string>
+    <string name="cal_finished_text">Window will automatically close momentarily</string>
 
 </resources>

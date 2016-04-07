@@ -145,21 +145,14 @@ public class ArduinoCom implements Runnable{
             calibrate(sharedPrefs);
         }
 
-        // Tell the Arudino that it is time to start
-        String start = "<START>";
-        if (!writeData(start)) {
-            // unable to write start command
-            mConnected = false;
-            return;
-        }
-
-        setCoefficients(sharedPrefs);
+        mConnected = startUinput(sharedPrefs);
 
         // Set up the orientation listener
         orientationListener = new OrientationEventListener(mContext) {
             @Override
             public void onOrientationChanged(int orientation) {
-                setCoefficients(PreferenceManager.getDefaultSharedPreferences(mContext));
+
+                startUinput(PreferenceManager.getDefaultSharedPreferences(mContext));
             }
         };
 
@@ -175,6 +168,12 @@ public class ArduinoCom implements Runnable{
         IntentFilter sendDataFilter = new IntentFilter(mContext.getString(R.string.ACTION_SEND_DATA));
         mContext.registerReceiver(writeReciever, sendDataFilter);
         isWriteReceiverRegistered = true;
+
+        // Tell the Arudino that it is time to start
+        if (!writeData("<START>")) {
+            // unable to write start command
+            mConnected = false;
+        }
 
     }
 
@@ -220,7 +219,7 @@ public class ArduinoCom implements Runnable{
 
     }
 
-    private void setCoefficients(SharedPreferences sharedPrefs) {
+    private boolean startUinput(SharedPreferences sharedPrefs) {
 
         // Calibration coefficients
         float A;
@@ -263,14 +262,19 @@ public class ArduinoCom implements Runnable{
         zResistanceMin = sharedPrefs.getInt("pref_key_z_resistance_min", 0);
         zResistanceMax = sharedPrefs.getInt("pref_key_z_resistance_max", 0);
 
+        Point maxSize = new Point();
+        myDisplay.getRealSize(maxSize);
+
         if (uInput == null) {
-            uInput = new NativeInput(A, B, C, D, E, F, zResistanceMin, zResistanceMax);
+            uInput = new NativeInput(A, B, C, D, E, F, zResistanceMin, zResistanceMax,
+                    maxSize.x, maxSize.y);
         }
         else {
-            uInput.setCoefficients(A, B, C, D, E, F, zResistanceMin, zResistanceMax);
+            uInput.setupVirtualDevice(A, B, C, D, E, F, zResistanceMin, zResistanceMax,
+                    maxSize.x, maxSize.y);
         }
 
-
+        return uInput.isVirtualDeviceOpen();
     }
 
     public boolean isConnected() {
@@ -622,9 +626,13 @@ public class ArduinoCom implements Runnable{
         int xOffset = Math.round(0.1f * maxSize.x);
         int yOffset = Math.round(0.1f * maxSize.y);
 
-        deviceP1 = new Point((maxSize.x - xOffset), (maxSize.y / 2));
-        deviceP2 = new Point((maxSize.x) / 2, (maxSize.y - yOffset));
-        deviceP3 = new Point(xOffset, yOffset);
+
+        // Points are zero indexed, so we always subtract 1 pixel
+        deviceP1 = new Point(((maxSize.x - xOffset) - 1),
+                ((maxSize.y / 2) - 1));
+        deviceP2 = new Point(((maxSize.x / 2) - 1),
+                ((maxSize.y - yOffset) - 1));
+        deviceP3 = new Point((xOffset - 1), (yOffset - 1));
 
         // TODO: Verify math is correct
 
@@ -683,6 +691,10 @@ public class ArduinoCom implements Runnable{
             btManager.uninitBluetooth();
             mConnected = false;
             btManager = null;
+        }
+
+        if (uInput != null) {
+            uInput.closeVirtualDevice();
         }
 
         if (isWriteReceiverRegistered) {

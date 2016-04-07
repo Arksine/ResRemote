@@ -6,3 +6,6 @@
 .DS_Store
 /build
 /captures
+
+arduino_alg.txt
+uinput_alg.txt

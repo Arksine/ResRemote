@@ -1,6 +1,8 @@
 package com.arksine.resremote;
 
-import android.graphics.Point;
+import android.util.Log;
+
+import java.io.File;
 
 /**
  * Class NativeInput
@@ -23,30 +25,25 @@ public class NativeInput {
     private int pressureOffset;
     private float pressureCoef;
 
-    NativeInput() {
+    private boolean uinputOpen = false;
 
-        A = 0.0f;
-        B = 0.0f;
-        C = 0.0f;
-        D = 0.0f;
-        E = 0.0f;
-        F = 0.0f;
+    private native boolean openUinput(int screenSizeX, int screenSizeY);
+    private native void processEvent(String command, int x, int y, int z);
+    private native void closeUinput();
 
+    static {
+        System.loadLibrary("restouchdrv");
     }
-
-    // TODO: Even though I'm calculating Z, I'll probably use an arbitrary pressure when sending
-    //       events to uInput in the first implementation.  I want to see how it works.
 
     NativeInput(float A, float B, float C, float D, float E, float F,
-                int zResistanceMin, int zResistanceMax) {
+                int zResistanceMin, int zResistanceMax, int screenSizeX, int screenSizeY) {
 
-        setCoefficients(A, B, C, D, E, F, zResistanceMin, zResistanceMax);
-
+        setupVirtualDevice(A, B, C, D, E, F, zResistanceMin, zResistanceMax, screenSizeX, screenSizeY);
 
     }
 
-    public void setCoefficients(float A, float B, float C, float D, float E, float F,
-            int zResistanceMin, int zResistanceMax) {
+    public void setupVirtualDevice(float A, float B, float C, float D, float E, float F,
+            int zResistanceMin, int zResistanceMax, int screenSizeX, int screenSizeY) {
 
         this.A = A;
         this.B = B;
@@ -56,6 +53,26 @@ public class NativeInput {
         this.F = F;
 
         calibratePressure(zResistanceMin, zResistanceMax);
+
+
+        // TODO:  I may not need to close and reopen the the device when the orientation changes.
+        //        its possible that android changes the x and y values for me.
+        // If uinput is already open, close it first
+        if (uinputOpen) {
+            closeVirtualDevice();
+        }
+        File uinputFile = new File("/dev/uinput");
+        if (uinputFile.exists()) {
+            if(uinputFile.canRead()){
+                uinputOpen = openUinput(screenSizeX, screenSizeY);
+            }
+            else {
+                Log.e(TAG, "Unable to read /dev/uinput, are permissions set correctly?");
+            }
+        }
+        else {
+            Log.e(TAG, "/dev/input does not exist on your device");
+        }
 
     }
 
@@ -79,8 +96,8 @@ public class NativeInput {
     public void processInput(String command, TouchPoint screenCoord) {
 
         TouchPoint deviceCoord = getDeviceCoord(screenCoord);
+        processEvent(command, deviceCoord.getX(), deviceCoord.getY(), deviceCoord.getZ());
 
-        // TODO: Send deviceCoordinate to JNI code so events cant be processed by uInput
     }
 
     /**
@@ -102,6 +119,16 @@ public class NativeInput {
 
         deviceCoord = new TouchPoint(x, y, z);
         return deviceCoord;
+    }
+
+    public void closeVirtualDevice() {
+
+        closeUinput();
+        uinputOpen = false;
+    }
+
+    public boolean isVirtualDeviceOpen() {
+        return uinputOpen;
     }
 
 }
