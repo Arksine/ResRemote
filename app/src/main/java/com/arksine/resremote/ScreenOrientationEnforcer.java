@@ -46,7 +46,7 @@ public class ScreenOrientationEnforcer {
 		WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams();
 
 		//So we don't need a permission or activity
-		layoutParams.type = WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY;
+		layoutParams.type = WindowManager.LayoutParams.TYPE_TOAST;
 
 		//Just in case the window type somehow doesn't enforce this
 		layoutParams.flags = layoutParams.flags |

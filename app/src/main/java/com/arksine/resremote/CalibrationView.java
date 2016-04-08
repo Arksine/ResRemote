@@ -6,6 +6,7 @@ import android.graphics.Path;
 import android.graphics.Point;
 import android.graphics.drawable.ShapeDrawable;
 import android.graphics.drawable.shapes.PathShape;
+import android.util.AttributeSet;
 import android.view.View;
 
 /**
@@ -19,8 +20,8 @@ public class CalibrationView extends View {
 
 	private boolean drawablesSet = false;
 
-	public CalibrationView(Context context) {
-		super(context);
+	public CalibrationView(Context context, AttributeSet attrs) {
+		super(context, attrs);
 
 	}
 

@@ -4,14 +4,16 @@
 #define XM A2  // must be an analog pin, use "An" notation!
 #define YM 8   // can be a digital pin
 #define XP 9   // can be a digital pin
+#define XPLATE 470  // Resistance across the X-plate of the touchscreen
 
-TouchScreen ts = TouchScreen(XP, YP, XM, YM, 470);
+// TODO:  need to measure resistance of the x-plate on the camaro touch screen
+TouchScreen ts = TouchScreen(XP, YP, XM, YM, XPLATE);
 
 boolean start = false;
 boolean isTouching;
 
 void setup() {
-  Serial.begin(38400);
+  Serial.begin(115200);
   while (!Serial);
   Serial.flush();
   
@@ -42,6 +44,8 @@ void loop() {
       Serial.print("<UP:0:0:0>");
     }
   }
+
+  //TODO: Get command to toggle touchscreen switcher on/off here.  
   
   delay(10);
 }
@@ -51,14 +55,7 @@ void checkStart() {
   String command;
 
   while (!start) {
-    command = "";
-    // read serial commands from the tablet if available
-    while (Serial.available() > 0)
-    {
-      delay(2);
-      char c = Serial.read();
-      command += c;
-    }
+    command = getCommand();
 
     if (command == "<START>") {
       start = true;
@@ -71,7 +68,22 @@ void checkStart() {
       // Get points until the user lifts their finger
       getPressure();
     }
+
+    delay(10);
   }
+}
+
+String getCommand() {
+  String command = "";
+  
+  while (Serial.available() > 0)
+  {
+    delay(2);
+    char c = Serial.read();
+    command += c;
+  }
+
+  return command;
 }
 
 void getPoint() {

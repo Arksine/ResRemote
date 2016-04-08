@@ -11,12 +11,13 @@
     <string name="ACTON_CALIBRATE_PRESSURE">com.arksine.resremote.ACTION_CALIBRATE_PRESSURE</string>
     <string name="ACTION_CALIBRATE_END">com.arksine.resremote.ACTION_CALIBRATE_END</string>
     <string name="ACTION_PRESSURE_RECEIVED">com.arksine.resremote.ACTION_PRESSURE_RECEIVED</string>
+    <string name="ACTION_CAL_ACTIVITY_STARTED">com.arksine.resremote.ACTION_CAL_ACTIVITY_STARTED</string>
 
     <!-- Strings related to Settings -->
 
     <string name="pref_select_bt_device">Select Bluetooth Device</string>
     <string-array name="pref_select_bt_device_entries">
-        <item>No Devices Found</item>
+        <item>No Device Selected</item>
     </string-array>
     <string-array name="pref_select_bt_device_values">
         <item>NO_DEVICE</item>

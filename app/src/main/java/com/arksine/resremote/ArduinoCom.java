@@ -60,7 +60,7 @@ public class ArduinoCom implements Runnable{
 
         @Override
         public void handleMessage(Message msg) {
-            ArduinoMessage message = parseBytes((byte[])msg.obj, msg.arg1);
+            ArduinoMessage message = (ArduinoMessage) msg.obj;
             uInput.processInput(message.command, message.point);
         }
     }
@@ -290,30 +290,14 @@ public class ArduinoCom implements Runnable{
 
         mRunning = true;
 
-        int numBytes;
-        byte[] buffer = new byte[256];  // Max line of 256
         while (mRunning) {
-            try {
 
-                // blocks until bytes are read
-                numBytes = arudinoInput.read(buffer);
-
-                // if a message was received, send it to the message handler
-                // for processing
-
-                Message msg = mInputHandler.obtainMessage();
-                msg.obj = buffer;
-                msg.arg1 = numBytes;
-                mInputHandler.sendMessage(msg);
-
-
-            } catch(IOException e) {
-                // If the device is disconnected or we have a read error, break the loop
-                break;
-            }
+            ArduinoMessage message = readMessage();
+            Message msg = mInputHandler.obtainMessage();
+            msg.obj = message;
+            mInputHandler.sendMessage(msg);
 
         }
-
     }
 
 	/**
@@ -333,19 +317,29 @@ public class ArduinoCom implements Runnable{
         return true;
     }
 
-	/**
-     * Parses bytes received from a serial read
-	 *
-     * @param message - the bytes to parse
-     * @param numBytes - the number of bytes received in the message
-     */
-    private ArduinoMessage parseBytes(byte[] message, int numBytes) {
 
-        // Create string from byte array.  The bytes come in this format:
-        // <command:x:y:z>
-        // We ignore the opening and closing brackets when creating our string
-        String msg = new String(message, 1, numBytes - 2 );
-        String[] tokens = msg.split(":");
+    // Reads a message from the arduino and parses it
+    private ArduinoMessage readMessage() {
+
+        String message = "";
+        int bytes = 0;
+        byte ch;
+        try {
+            // get the first byte, it should be a '<'
+            ch = (byte)arudinoInput.read();
+            if (ch != '<') {
+                return null;
+            }
+
+            // First byte is good, capture the rest until we get to the end of the message
+            while ((ch = (byte)arudinoInput.read()) != '>') {
+                bytes++;
+                message += ch;
+            }
+        }
+        catch (IOException e){ return null;}
+
+        String[] tokens = message.split(":");
 
         if (tokens.length != 4) {
             Log.e(TAG, "Issue parsing string, invalid data recd");
@@ -360,6 +354,23 @@ public class ArduinoCom implements Runnable{
         return ardMsg;
     }
 
+    // We need the variable below to let us know that the Calibration activity is loaded
+    // and started
+    private volatile boolean calStarted = false;
+    BroadcastReceiver calStartedReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action.equals(mContext.getString(R.string.ACTION_CAL_ACTIVITY_STARTED))) {
+                calStarted = true;
+            }
+        }
+    };
+
+	/**
+     * Calibrates the touchscreen
+     * @param sharedPrefs
+     */
     public void calibrate (SharedPreferences sharedPrefs) {
 
         LocalBroadcastManager localBroadcast = LocalBroadcastManager.getInstance(mContext);
@@ -371,8 +382,19 @@ public class ArduinoCom implements Runnable{
 
         mRunning = true;
 
+        // Register the reciever we need to make sure the calibration activity is started
+        IntentFilter filter = new IntentFilter(mContext.getString(R.string.ACTION_CAL_ACTIVITY_STARTED));
+        localBroadcast.registerReceiver(calStartedReceiver, filter);
+
+        // Start the calibration activity
         Intent calibrateIntent = new Intent(mContext, CalibrateTouchScreen.class);
+        calibrateIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         mContext.startActivity(calibrateIntent);
+
+
+        while (!calStarted);  // wait until the broadcast receiver returns
+        calStarted = false;
+        localBroadcast.unregisterReceiver(calStartedReceiver);
 
         String orientation = sharedPrefs.getString("pref_key_select_orientation", "Landscape");
         // If the orientation is dynamic, we need run through the orientation twice
@@ -446,8 +468,6 @@ public class ArduinoCom implements Runnable{
     private Point[] getTouchPoints(LocalBroadcastManager localBroadcast) {
 
         Point[] touchPoints = new Point[3];
-        int numBytes;
-        byte[] buffer = new byte[256]; // Max line size of 256
         ArduinoMessage screenPt;
         Intent calIntent;
 
@@ -457,21 +477,15 @@ public class ArduinoCom implements Runnable{
             // Tell the Arudino to recieve a single point
             writeData("<CAL_POINT>");
 
-            try {
-                numBytes = arudinoInput.read(buffer);
-
-                screenPt = parseBytes(buffer, numBytes);
-                if (screenPt == null){
-                    // Error parsing bytes
-                    Log.e(TAG, "Error Parsing Calibration data from arduino");
-                    return null;
-                }
-                touchPoints[i] = new Point(screenPt.point.getX(), screenPt.point.getY());
-
-            } catch (IOException e) {
-                // If the device is disconnected or we have a read error, break the loop
+            screenPt = readMessage();
+            if (screenPt == null){
+                // Error parsing bytes
+                Log.e(TAG, "Error Parsing Calibration data from arduino");
                 return null;
             }
+            touchPoints[i] = new Point(screenPt.point.getX(), screenPt.point.getY());
+
+
 
             // Since we are telling the activity to move to the next point, we don't need
             // to move past index 2 (which is the third point)
@@ -518,42 +532,32 @@ public class ArduinoCom implements Runnable{
         public void run() {
             isRunning = true;
 
-            int numBytes;
-            byte[] buffer = new byte[256];
             ArduinoMessage screenPt;
 
             writeData("<CAL_PRESSURE>");
             while (isRunning) {
 
-                try {
-                    numBytes = arudinoInput.read(buffer);
-
-                    screenPt = parseBytes(buffer, numBytes);
-                    if (screenPt == null){
-                        // Error parsing bytes
-                        Log.e(TAG, "Error Parsing Calibration data from arduino");
-                        break;
-                    }
-                    // We'll receive a stop command from the arduino after the user has
-                    // lifted their finger
-                    if (screenPt.command.equals("<STOP>")){
-                        isRunning = false;
-                        break;
-                    }
-
-                    if (screenPt.point.getZ() < resistanceMin) {
-                        resistanceMin = screenPt.point.getZ();
-                    }
-                    if (screenPt.point.getZ() > resistanceMax) {
-                        resistanceMax = screenPt.point.getZ();
-                    }
-
-                } catch (IOException e) {
-                    // If the device is disconnected or we have a read error, break the loop
+                screenPt = readMessage();
+                if (screenPt == null){
+                    // Error parsing bytes
+                    Log.e(TAG, "Error Parsing Calibration data from arduino");
                     break;
                 }
-            }
+                // We'll receive a stop command from the arduino after the user has
+                // lifted their finger
+                if (screenPt.command.equals("<STOP>")){
+                    isRunning = false;
+                    break;
+                }
 
+                if (screenPt.point.getZ() < resistanceMin) {
+                    resistanceMin = screenPt.point.getZ();
+                }
+                if (screenPt.point.getZ() > resistanceMax) {
+                    resistanceMax = screenPt.point.getZ();
+                }
+
+            }
         }
     }
 

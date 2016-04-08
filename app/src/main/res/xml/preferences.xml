@@ -4,8 +4,6 @@
         android:key="pref_key_select_bt_device"
         android:title="@string/pref_select_bt_device"
         android:dialogTitle="@string/pref_select_bt_device"
-        android:entries="@array/pref_select_bt_device_entries"
-        android:entryValues="@array/pref_select_bt_device_values"
         android:persistent="true"
         android:defaultValue="@string/pref_select_bt_device_default" />
     <PreferenceScreen
@@ -22,7 +20,7 @@
         android:entries="@array/pref_select_orientation_entries"
         android:entryValues="@array/pref_select_orientation_values"
         android:persistent="true"
-        android:defaultValue="0" />
+        android:defaultValue="Landscape" />
 
     <PreferenceScreen
         android:key="pref_key_calibrate"

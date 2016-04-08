@@ -33,7 +33,7 @@ public class ResRemoteActivity extends Activity {
 
         btManager = new BluetoothManager(this);
 
-        if (bluetoothEnabled) {
+        if (btManager.isBluetoothOn() || bluetoothEnabled) {
 
             getFragmentManager().beginTransaction()
                     .add(android.R.id.content, new SettingsFragment())
@@ -76,11 +76,11 @@ public class ResRemoteActivity extends Activity {
             ListPreference selectDevice = (ListPreference) root.findPreference("pref_key_select_bt_device");
             ListPreference selectOrientation = (ListPreference) root.findPreference("pref_key_select_orientation");
 
-            selectDevice.setSummary(selectDevice.getEntry());
-            selectOrientation.setSummary(selectOrientation.getEntry());
-
             ArrayList<String> mAdapterList = btManager.enumerateDevices();
             populateDeviceListView(mAdapterList, selectDevice);
+
+            selectDevice.setSummary(selectDevice.getEntry());
+            selectOrientation.setSummary(selectOrientation.getEntry());
 
             selectDevice.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
                 @Override

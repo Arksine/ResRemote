@@ -46,6 +46,7 @@ public class CalibrateTouchScreen extends Activity {
     private LocalBroadcastManager localBroadcast;
 
     private Point[] devicePoints;       // Array containing the location of each device point to show
+    private volatile int pointIndex;
     private int shapeSize;              // Size of the shapes to draw on the view
     private String orientationPref;     // the orientation requested in shared preferences
 
@@ -85,6 +86,50 @@ public class CalibrateTouchScreen extends Activity {
         }
     };
 
+	/**
+     *  Start Runnables for UI updates (they are executed in another thread)
+     */
+    private final Runnable uiStartRunnable = new Runnable() {
+        @Override
+        public void run() {
+            devicePoints = new Point[NUMPOINTS];
+            getDevicePoints();
+            calView.setDrawables(devicePoints[0], devicePoints[1], devicePoints[2],
+                    shapeSize);
+            calView.invalidate();
+            PointTarget target = new PointTarget(devicePoints[0]);
+            showcase.setTarget(target);
+        }
+    };
+
+    private final Runnable uiMovePointRunnable = new Runnable() {
+        @Override
+        public void run() {
+            PointTarget target = new PointTarget(devicePoints[pointIndex]);
+            showcase.setTarget(target);
+        }
+    };
+
+    private final Runnable uiPressureRunnable = new Runnable() {
+        @Override
+        public void run() {
+            showcase.setTarget(Target.NONE);
+            showcase.setContentTitle(getString(R.string.cal_pressure_title));
+            showcase.setContentText(getString(R.string.cal_pressure_text));
+        }
+    };
+
+    private final Runnable uiExitRunnable = new Runnable() {
+        @Override
+        public void run() {
+            showcase.setContentTitle(getString(R.string.cal_finshed_title));
+            showcase.setContentText(getString(R.string.cal_finished_text));
+        }
+    };
+	/**
+     * End Runnables for UI updates
+     */
+
     private final Runnable exitActivityRunnable = new Runnable() {
         @Override
         public void run() {
@@ -96,7 +141,7 @@ public class CalibrateTouchScreen extends Activity {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-            PointTarget target;
+
 
             switch (action){
                 case ACTION_CALIBRATE_START:
@@ -111,27 +156,17 @@ public class CalibrateTouchScreen extends Activity {
                             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
                         }
                     }
-                    devicePoints = new Point[NUMPOINTS];
-                    getDevicePoints();
-                    calView.setDrawables(devicePoints[0], devicePoints[1], devicePoints[2],
-                            shapeSize);
-                    calView.invalidate();
-                    target = new PointTarget(devicePoints[0]);
-                    showcase.setTarget(target);
+                    runOnUiThread(uiStartRunnable);
                     break;
                 case ACTION_CALIBRATE_NEXT:
-                    int pointIdx = intent.getIntExtra("point_index", 0);
-                    target = new PointTarget(devicePoints[pointIdx]);
-                    showcase.setTarget(target);
+                    pointIndex = intent.getIntExtra("point_index", 0);
+                    runOnUiThread(uiMovePointRunnable);
                     break;
                 case ACTION_CALIBRATE_PRESSURE:
-                    showcase.setTarget(Target.NONE);
-                    showcase.setContentTitle(getString(R.string.cal_pressure_title));
-                    showcase.setContentText(getString(R.string.cal_pressure_text));
+                    runOnUiThread(uiPressureRunnable);
                     break;
                 case ACTION_CALIBRATE_END:
-                    showcase.setContentTitle(getString(R.string.cal_finshed_title));
-                    showcase.setContentText(getString(R.string.cal_finished_text));
+                    runOnUiThread(uiExitRunnable);
                     // Exit the activity in 3 seconds
                     eventHandler.postDelayed(exitActivityRunnable, 3000);
                     break;
@@ -148,7 +183,8 @@ public class CalibrateTouchScreen extends Activity {
 
 
         setContentView(R.layout.activity_calibrate_touch_screen);
-        calView = (CalibrationView) findViewById(R.id.CalView);
+        calView = (CalibrationView) findViewById(R.id.CalView
+        );
 
         localBroadcast = LocalBroadcastManager.getInstance(this);
 
@@ -160,7 +196,7 @@ public class CalibrateTouchScreen extends Activity {
         getShapeSize();
 
         showcase = new ShowcaseView.Builder(this)
-                .setShowcaseDrawer(new CalShowcaseDrawer(getResources(), (shapeSize / 2)))
+                .setShowcaseDrawer(new CalShowcaseDrawer(shapeSize / 2))
                 .setStyle(R.style.CalibrationShowcaseStyle)
                 .setContentTitle(R.string.cal_title)
                 .setContentText(R.string.cal_text)
@@ -175,6 +211,15 @@ public class CalibrateTouchScreen extends Activity {
         filter.addAction(getString(R.string.ACTION_CALIBRATE_END));
         localBroadcast.registerReceiver(calReceiver, filter);
 
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        // Broadcast that the activity is started
+        Intent started = new Intent(getString(R.string.ACTION_CAL_ACTIVITY_STARTED));
+        localBroadcast.sendBroadcastSync(started);
     }
 
     private void exitActivity() {
@@ -250,8 +295,8 @@ public class CalibrateTouchScreen extends Activity {
         private final Paint eraserPaint;
         private int backgroundColor;
 
-        public CalShowcaseDrawer(Resources resources, int radius) {
-            this.radius = resources.getDimension(radius);
+        public CalShowcaseDrawer(int radius) {
+            this.radius = radius;
             this.eraserPaint = new Paint();
             this.eraserPaint.setColor(0xFFFFFF);
             this.eraserPaint.setAlpha(0);
