@@ -3,6 +3,10 @@ package com.arksine.resremote;
 import android.util.Log;
 
 import java.io.File;
+import java.util.List;
+
+import eu.chainfire.libsuperuser.Shell;
+
 
 /**
  * Class NativeInput
@@ -44,6 +48,8 @@ public class NativeInput {
 
     public void setupVirtualDevice(float A, float B, float C, float D, float E, float F,
             int zResistanceMin, int zResistanceMax, int screenSizeX, int screenSizeY) {
+
+        grantUinputPrivs();
 
         this.A = A;
         this.B = B;
@@ -125,10 +131,33 @@ public class NativeInput {
 
         closeUinput();
         uinputOpen = false;
+        revokeUinputPrivs();
     }
 
     public boolean isVirtualDeviceOpen() {
         return uinputOpen;
+    }
+
+    // The functions below use Root (su) to grant privileges to use uinput
+    private void grantUinputPrivs() {
+
+        // TODO: is this working?
+
+        String command = "chmod a+rw /dev/uinput";
+        List<String> output =  Shell.SU.run(command);
+
+        output = Shell.SU.run("ls -l /dev/uinput");
+        Log.i(TAG, "SU output:");
+        for (String line : output) {
+            Log.i(TAG, line);
+        }
+    }
+
+    private void revokeUinputPrivs() {
+
+        String command =  "chmod 660 /dev/uinput";
+        Shell.SU.run(command);
+
     }
 
 }

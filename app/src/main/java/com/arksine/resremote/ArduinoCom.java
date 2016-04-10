@@ -94,7 +94,9 @@ public class ArduinoCom implements Runnable{
     }
 
     ArduinoCom(Context context) {
+
         mContext = context;
+
         btManager = new BluetoothManager(mContext);
         HandlerThread thread = new HandlerThread("ServiceStartArguments",
                 Process.THREAD_PRIORITY_BACKGROUND);
@@ -145,7 +147,10 @@ public class ArduinoCom implements Runnable{
             calibrate(sharedPrefs);
         }
 
-        mConnected = startUinput(sharedPrefs);
+        if (!startUinput(sharedPrefs)) {
+            mConnected = false;
+            return;
+        };
 
         // Set up the orientation listener
         orientationListener = new OrientationEventListener(mContext) {
@@ -293,9 +298,11 @@ public class ArduinoCom implements Runnable{
         while (mRunning) {
 
             ArduinoMessage message = readMessage();
-            Message msg = mInputHandler.obtainMessage();
-            msg.obj = message;
-            mInputHandler.sendMessage(msg);
+            if (message != null) {
+                Message msg = mInputHandler.obtainMessage();
+                msg.obj = message;
+                mInputHandler.sendMessage(msg);
+            }
 
         }
     }
@@ -321,24 +328,22 @@ public class ArduinoCom implements Runnable{
     // Reads a message from the arduino and parses it
     private ArduinoMessage readMessage() {
 
-        String message = "";
         int bytes = 0;
+        byte[] buffer = new byte[256];
         byte ch;
         try {
-            // get the first byte, it should be a '<'
-            ch = (byte)arudinoInput.read();
-            if (ch != '<') {
-                return null;
-            }
+            // get the first byte, anything other than a '<' is trash and will be ignored
+            while((ch = (byte)arudinoInput.read()) != '<');
 
             // First byte is good, capture the rest until we get to the end of the message
             while ((ch = (byte)arudinoInput.read()) != '>') {
+                buffer[bytes] = ch;
                 bytes++;
-                message += ch;
             }
         }
         catch (IOException e){ return null;}
 
+        String message = new String(buffer, 0, bytes);
         String[] tokens = message.split(":");
 
         if (tokens.length != 4) {
@@ -410,6 +415,11 @@ public class ArduinoCom implements Runnable{
             }
             calcCoefficients(sharedPrefs, touchPoints[0], touchPoints[1], touchPoints[2]);
 
+            // Sleep for one second so the UI has time to animate to the next point
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) { }
+
             // Get portrait touchpoints
             calibrateIntent = new Intent(mContext.getString(R.string.ACTION_CALIBRATE_START));
             calibrateIntent.setClass(mContext, CalibrateTouchScreen.CalibrateReceiver.class);
@@ -442,7 +452,7 @@ public class ArduinoCom implements Runnable{
         // broadcast an intent to the calibration activity telling it to end
         calibrateIntent = new Intent(mContext.getString(R.string.ACTION_CALIBRATE_END));
         calibrateIntent.setClass(mContext, CalibrateTouchScreen.CalibrateReceiver.class);
-        localBroadcast.sendBroadcast(calibrateIntent);
+        localBroadcast.sendBroadcastSync(calibrateIntent);
 
         // Set ix_x_calibrated to true
         switch (orientation) {
@@ -485,6 +495,8 @@ public class ArduinoCom implements Runnable{
             }
             touchPoints[i] = new Point(screenPt.point.getX(), screenPt.point.getY());
 
+            Log.i(TAG, "Point " + i + " X value: " + touchPoints[i].x);
+            Log.i(TAG, "Point " + i + " Y value: " + touchPoints[i].y);
 
 
             // Since we are telling the activity to move to the next point, we don't need
@@ -496,12 +508,13 @@ public class ArduinoCom implements Runnable{
                 // send an index to the next point
                 calIntent.putExtra("point_index", (i + 1));
                 localBroadcast.sendBroadcastSync(calIntent);
-            }
 
-            // Sleep for one second so the UI has time to animate to the next point
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) { }
+                // Sleep for one second so the UI has time to animate to the next point
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) { }
+
+            }
 
         }
         return touchPoints;
@@ -513,7 +526,7 @@ public class ArduinoCom implements Runnable{
     private class ReadResistanceRunnable implements Runnable {
         private volatile boolean isRunning = true;
 
-        private int resistanceMin = 0xFFFFFFFF;
+        private int resistanceMin = 65535;
         private int resistanceMax = 0;
 
         public int getResistanceMin() {
@@ -545,7 +558,7 @@ public class ArduinoCom implements Runnable{
                 }
                 // We'll receive a stop command from the arduino after the user has
                 // lifted their finger
-                if (screenPt.command.equals("<STOP>")){
+                if (screenPt.command.equals("STOP")){
                     isRunning = false;
                     break;
                 }
@@ -558,6 +571,9 @@ public class ArduinoCom implements Runnable{
                 }
 
             }
+
+            Log.i(TAG, "Min resistance: " + resistanceMin);
+            Log.i(TAG, "Max resistance: " + resistanceMax);
         }
     }
 
@@ -569,10 +585,14 @@ public class ArduinoCom implements Runnable{
         final ReadResistanceRunnable readResistance = new ReadResistanceRunnable();
         Thread readResistanceThread = new Thread(readResistance);
 
-        // Tell the calibration activity to start receiving pressure
         Intent calIntent = new Intent(mContext.getString(R.string.ACTON_CALIBRATE_PRESSURE));
         calIntent.setClass(mContext, CalibrateTouchScreen.CalibrateReceiver.class);
         localBroadcast.sendBroadcastSync(calIntent);
+
+        // Sleep for one second so the UI has time to animate to the next point
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) { }
 
         // Start the thread
         readResistanceThread.start();
@@ -589,8 +609,6 @@ public class ArduinoCom implements Runnable{
             readResistance.stopRunning();
             // TODO: should probably tell the activity that the request to get pressure timed out
         }
-
-        writeData("<CAL_PRESSURE_END>");
 
         sharedPrefs.edit().putInt("pref_key_z_resistance_min", readResistance.getResistanceMin())
                 .putInt("pref_key_z_resistance_max", readResistance.getResistanceMax())

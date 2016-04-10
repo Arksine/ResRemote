@@ -19,14 +19,14 @@ android {
         }
     }
     productFlavors {
-        
+
     }
 
     splits {
         abi {
             enable true
             reset()
-            include 'x86', 'armeabi-v7a'
+            include 'x86', 'armeabi-v7a', 'arm64-v8a', 'x86_64'
             universalApk true
         }
     }
@@ -51,6 +51,7 @@ android {
     }
 
     clean.dependsOn ndkClean
+    sourceSets { main { assets.srcDirs = ['src/main/assets', 'src/armeabi-v7a/assets'] } }
 }
 
 dependencies {
@@ -59,6 +60,7 @@ dependencies {
     compile 'com.android.support:appcompat-v7:23.2.1'
     compile 'com.android.support:support-v4:23.2.1'
     compile 'com.github.amlcurran.showcaseview:library:5.4.2'
+    compile 'eu.chainfire:libsuperuser:1.0.0.+'
 }
 
 def getNdkDir() {

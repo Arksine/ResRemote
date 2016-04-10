@@ -18,6 +18,7 @@ int prevXCoord = 0;
 int prevYCoord = 0;
 const int trackingID = 9000;
 
+
 // TODO: this is an arbitrary pressure for initial testing, once the app is working 
 //		 we will attempt to use pressure calculated from the screen
 const int pressure = 50;		
@@ -55,21 +56,25 @@ extern "C" {
 		uinp.absmax[ABS_MT_PRESSURE] = 255;
 
 		// Setup the uinput device
-		ioctl(uinp_fd, UI_SET_EVBIT, EV_KEY);
-		ioctl(uinp_fd, UI_SET_EVBIT, EV_REL);
-		ioctl(uinp_fd, UI_SET_EVBIT, EV_SYN);
+		int ret = 0;
+		ret = ret | ioctl(uinp_fd, UI_SET_EVBIT, EV_KEY);
+		ret = ret | ioctl(uinp_fd, UI_SET_EVBIT, EV_REL);
+		ret = ret | ioctl(uinp_fd, UI_SET_EVBIT, EV_SYN);
     
 		// Touch
-		ioctl (uinp_fd, UI_SET_EVBIT,  EV_ABS);
-		ioctl (uinp_fd, UI_SET_ABSBIT, ABS_MT_SLOT);
-		ioctl (uinp_fd, UI_SET_ABSBIT, ABS_MT_TOUCH_MAJOR);
-		ioctl (uinp_fd, UI_SET_ABSBIT, ABS_MT_POSITION_X);
-		ioctl (uinp_fd, UI_SET_ABSBIT, ABS_MT_POSITION_Y);
-		ioctl (uinp_fd, UI_SET_ABSBIT, ABS_MT_TRACKING_ID);
-		ioctl (uinp_fd, UI_SET_ABSBIT, ABS_MT_PRESSURE);    
-		ioctl (uinp_fd, UI_SET_PROPBIT, INPUT_PROP_DIRECT);
+		ret = ret | ioctl (uinp_fd, UI_SET_EVBIT,  EV_ABS);
+		ret = ret | ioctl (uinp_fd, UI_SET_ABSBIT, ABS_MT_SLOT);
+		ret = ret | ioctl (uinp_fd, UI_SET_ABSBIT, ABS_MT_TOUCH_MAJOR);
+		ret = ret | ioctl (uinp_fd, UI_SET_ABSBIT, ABS_MT_POSITION_X);
+		ret = ret | ioctl (uinp_fd, UI_SET_ABSBIT, ABS_MT_POSITION_Y);
+		ret = ret | ioctl (uinp_fd, UI_SET_ABSBIT, ABS_MT_TRACKING_ID);
+		ret = ret | ioctl (uinp_fd, UI_SET_ABSBIT, ABS_MT_PRESSURE);
+		ret = ret | ioctl (uinp_fd, UI_SET_PROPBIT, INPUT_PROP_DIRECT);
 
-    
+        if (ret < 0) {
+        LOGE("Unable to ioctl to device");
+        	return false;
+        }
 		/* Create input device into input sub-system */
 		write(uinp_fd, &uinp, sizeof(uinp));
 		ioctl(uinp_fd, UI_DEV_CREATE);
@@ -101,6 +106,7 @@ extern "C" {
 			else {					// holding
 				bool coordChanged = false;  // we need to send a sync event if something has changed
 
+				//TODO: I should probably use a percentage here.  Within 1%?
 				if (x != prevXCoord) {
 					send_event(EV_ABS, ABS_MT_POSITION_X, x);
 					prevXCoord = x;

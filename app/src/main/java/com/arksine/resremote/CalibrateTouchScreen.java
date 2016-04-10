@@ -9,7 +9,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
-import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -28,6 +27,14 @@ import com.github.amlcurran.showcaseview.ShowcaseDrawer;
 import com.github.amlcurran.showcaseview.ShowcaseView;
 import com.github.amlcurran.showcaseview.targets.PointTarget;
 import com.github.amlcurran.showcaseview.targets.Target;
+
+//TODO: 4-8-2016
+//      Decouple the Calibration activity from the service, and create
+//      its own app/package.  This will allow calibration for
+//      bluetooth serial, usb HID, and bluetooth HID via the same app.
+//      Conversion co-efficients will be calculated in this calibration
+//      app and written the the EEPROM of the Arduino, so the conversion
+//      will happen on the arduino rather than by the service.
 
 
 /**
@@ -98,7 +105,8 @@ public class CalibrateTouchScreen extends Activity {
                     shapeSize);
             calView.invalidate();
             PointTarget target = new PointTarget(devicePoints[0]);
-            showcase.setTarget(target);
+            //showcase.setShouldCentreText(true);
+            showcase.setShowcase(target, true);
         }
     };
 
@@ -106,14 +114,15 @@ public class CalibrateTouchScreen extends Activity {
         @Override
         public void run() {
             PointTarget target = new PointTarget(devicePoints[pointIndex]);
-            showcase.setTarget(target);
+            showcase.setShowcase(target, true);
         }
     };
 
     private final Runnable uiPressureRunnable = new Runnable() {
         @Override
         public void run() {
-            showcase.setTarget(Target.NONE);
+            PointTarget target = new PointTarget(getCenterPoint());
+            showcase.setShowcase(target, true);
             showcase.setContentTitle(getString(R.string.cal_pressure_title));
             showcase.setContentText(getString(R.string.cal_pressure_text));
         }
@@ -122,6 +131,7 @@ public class CalibrateTouchScreen extends Activity {
     private final Runnable uiExitRunnable = new Runnable() {
         @Override
         public void run() {
+            showcase.setTarget(Target.NONE);
             showcase.setContentTitle(getString(R.string.cal_finshed_title));
             showcase.setContentText(getString(R.string.cal_finished_text));
         }
@@ -141,7 +151,6 @@ public class CalibrateTouchScreen extends Activity {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-
 
             switch (action){
                 case ACTION_CALIBRATE_START:
@@ -188,7 +197,7 @@ public class CalibrateTouchScreen extends Activity {
 
         localBroadcast = LocalBroadcastManager.getInstance(this);
 
-        eventHandler.post(mHideRunnable);
+        hide();
 
         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
         orientationPref = sharedPrefs.getString("pref_key_select_orientation", "Landscape");
@@ -231,6 +240,19 @@ public class CalibrateTouchScreen extends Activity {
         super.onDestroy();
 
         localBroadcast.unregisterReceiver(calReceiver);
+    }
+
+    private Point getCenterPoint() {
+        DisplayManager displayManager = (DisplayManager)getSystemService(Context.DISPLAY_SERVICE);
+        Display myDisplay = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
+
+        Point maxSize = new Point();
+        myDisplay.getRealSize(maxSize);
+
+        int centerX = maxSize.x / 2 - 1;
+        int centerY = maxSize.y / 2 - 1;
+
+        return new Point(centerX, centerY);
     }
 
     private void getShapeSize() {
