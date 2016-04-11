@@ -88,8 +88,14 @@ public class ArduinoCom implements Runnable{
     private final WriteReciever writeReciever = new WriteReciever();
     boolean isWriteReceiverRegistered = false;
 
+    /**
+     * Container for a message recieved from the arduino.  There are two message types we can receive,
+     * logging types and point types.  Logging types fill in the desc string, point types fill in
+     * the TouchPoint.
+     */
     private class ArduinoMessage {
         public String command;
+        public String desc;
         public TouchPoint point;
     }
 
@@ -242,6 +248,11 @@ public class ArduinoCom implements Runnable{
 
         int rotation = myDisplay.getRotation();
 
+        Point maxSize = new Point();
+        myDisplay.getRealSize(maxSize);
+        int xMax;
+        int yMax;
+
         // Retreive coordinate coefficients based on rotation
         if (rotation == Surface.ROTATION_0 || rotation == Surface.ROTATION_180) {
             // Portrait
@@ -252,6 +263,10 @@ public class ArduinoCom implements Runnable{
             D = sharedPrefs.getFloat("pref_key_portrait_coefficient_d", 0.0f);
             E = sharedPrefs.getFloat("pref_key_portrait_coefficient_e", 0.0f);
             F = sharedPrefs.getFloat("pref_key_portrait_coefficient_f", 0.0f);
+
+            xMax = maxSize.x;
+            yMax = maxSize.y;
+
         }
         else {
             // Landscape
@@ -262,21 +277,23 @@ public class ArduinoCom implements Runnable{
             D = sharedPrefs.getFloat("pref_key_landscape_coefficient_d", 0.0f);
             E = sharedPrefs.getFloat("pref_key_landscape_coefficient_e", 0.0f);
             F = sharedPrefs.getFloat("pref_key_landscape_coefficient_f", 0.0f);
+
+            xMax = maxSize.y;
+            yMax = maxSize.x;
         }
 
         zResistanceMin = sharedPrefs.getInt("pref_key_z_resistance_min", 0);
         zResistanceMax = sharedPrefs.getInt("pref_key_z_resistance_max", 0);
 
-        Point maxSize = new Point();
-        myDisplay.getRealSize(maxSize);
+
 
         if (uInput == null) {
             uInput = new NativeInput(A, B, C, D, E, F, zResistanceMin, zResistanceMax,
-                    maxSize.x, maxSize.y);
+                    xMax, yMax, rotation);
         }
         else {
             uInput.setupVirtualDevice(A, B, C, D, E, F, zResistanceMin, zResistanceMax,
-                    maxSize.x, maxSize.y);
+                    xMax, yMax, rotation);
         }
 
         return uInput.isVirtualDeviceOpen();
@@ -299,9 +316,14 @@ public class ArduinoCom implements Runnable{
 
             ArduinoMessage message = readMessage();
             if (message != null) {
-                Message msg = mInputHandler.obtainMessage();
-                msg.obj = message;
-                mInputHandler.sendMessage(msg);
+                if (message.command.equals("LOG")) {
+                    Log.i("Arduino", message.desc);
+                } else {
+
+                    Message msg = mInputHandler.obtainMessage();
+                    msg.obj = message;
+                    mInputHandler.sendMessage(msg);
+                }
             }
 
         }
@@ -343,18 +365,33 @@ public class ArduinoCom implements Runnable{
         }
         catch (IOException e){ return null;}
 
+        ArduinoMessage ardMsg;
         String message = new String(buffer, 0, bytes);
         String[] tokens = message.split(":");
 
-        if (tokens.length != 4) {
+        if (tokens.length == 2) {
+            // command received or log message
+            ardMsg = new ArduinoMessage();
+
+            ardMsg.command = tokens[0];
+            ardMsg.desc = tokens[1];
+
+        }
+        else if (tokens.length == 4) {
+            // Point received
+            ardMsg = new ArduinoMessage();
+            ardMsg.command = tokens[0];
+            ardMsg.point = new TouchPoint(Integer.parseInt(tokens[1]),
+                    Integer.parseInt(tokens[2]), Integer.parseInt(tokens[3]));
+
+        }
+        else {
             Log.e(TAG, "Issue parsing string, invalid data recd");
-            return null;
+            ardMsg = null;
         }
 
-        ArduinoMessage ardMsg = new ArduinoMessage();
-        ardMsg.command = tokens[0];
-        ardMsg.point = new TouchPoint(Integer.parseInt(tokens[1]),
-                Integer.parseInt(tokens[2]), Integer.parseInt(tokens[3]));
+
+
 
         return ardMsg;
     }
@@ -656,11 +693,13 @@ public class ArduinoCom implements Runnable{
                 ((maxSize.y - yOffset) - 1));
         deviceP3 = new Point((xOffset - 1), (yOffset - 1));
 
-        // TODO: Verify math is correct
+        Log.i(TAG, "Device Point 1: x:" + deviceP1.x + " y:" +deviceP1.y);
+        Log.i(TAG, "Device Point 2: x:" + deviceP2.x + " y:" +deviceP2.y);
+        Log.i(TAG, "Device Point 3: x:" + deviceP3.x + " y:" +deviceP3.y);
 
         A = (deviceP1.x * (touchP2.y - touchP3.y)) + (deviceP2.x * (touchP3.y - touchP1.y))
                 + (deviceP3.x * (touchP1.y - touchP2.y));
-        A = A / (touchP1.x * (touchP2.y - touchP3.y) + (touchP2.x * (touchP3.y - touchP1.y))
+        A = A / ((touchP1.x * (touchP2.y - touchP3.y)) + (touchP2.x * (touchP3.y - touchP1.y))
                 + (touchP3.x * (touchP1.y - touchP2.y)));
 
         B = (A * (touchP3.x - touchP2.x)) + deviceP2.x - deviceP3.x;
@@ -708,8 +747,9 @@ public class ArduinoCom implements Runnable{
     }
 
     public void disconnect () {
+        mRunning = false;
+        writeData("<STOP>");
         if (btManager!= null) {
-            mRunning = false;
             btManager.uninitBluetooth();
             mConnected = false;
             btManager = null;
@@ -729,7 +769,7 @@ public class ArduinoCom implements Runnable{
      * Stops the loop in the run() command
      */
     public void stop() {
-
+        writeData("<STOP>");
         mRunning = false;
     }
 

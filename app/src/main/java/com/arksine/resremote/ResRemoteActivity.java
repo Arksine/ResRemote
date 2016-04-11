@@ -118,8 +118,7 @@ public class ResRemoteActivity extends Activity {
                 @Override
                 public boolean onPreferenceClick(Preference preference) {
                     Context mContext = getActivity();
-                    Intent stopIntent = new Intent(getString(R.string.ACTION_STOP_SERVICE))
-                            .setClass(mContext, ResRemoteService.StopReciever.class );
+                    Intent stopIntent = new Intent(getString(R.string.ACTION_STOP_SERVICE));
                     mContext.sendBroadcast(stopIntent);
                     return true;
                 }

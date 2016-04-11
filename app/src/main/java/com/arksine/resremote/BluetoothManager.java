@@ -224,7 +224,7 @@ public class BluetoothManager {
 
     public InputStream getInputStream() {
 
-        InputStream iStream;
+        InputStream iStream = null;
         if (mSocket != null) {
             try {
                 iStream = mSocket.getInputStream();

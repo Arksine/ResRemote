@@ -204,6 +204,9 @@ public class CalibrateTouchScreen extends Activity {
 
         getShapeSize();
 
+        // TODO:  need to create a button on the showcase that exits the app.  Also the showcase
+        //        doesn't initialll show on the whole screen, likely because there is a delay when
+        //        hiding the bars.  Need to fix this.
         showcase = new ShowcaseView.Builder(this)
                 .setShowcaseDrawer(new CalShowcaseDrawer(shapeSize / 2))
                 .setStyle(R.style.CalibrationShowcaseStyle)

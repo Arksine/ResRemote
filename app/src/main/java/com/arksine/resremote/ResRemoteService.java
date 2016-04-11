@@ -50,6 +50,10 @@ public class ResRemoteService extends Service {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if (getString(R.string.ACTION_STOP_SERVICE).equals(action)) {
+
+                if (arduino != null) {
+                    arduino.disconnect();
+                }
                 // stops all queued services
                 stopSelf();
             }
@@ -83,16 +87,18 @@ public class ResRemoteService extends Service {
                          *  permission: {read write}
                          *  Note - there are probably more permissions i'm missing
                          */
-                       /* String sePolicyLocation = PreferenceManager
+                        /*String sePolicyLocation = PreferenceManager
                                 .getDefaultSharedPreferences(getApplicationContext())
                                 .getString("pref_key_sepolicy_inject_location", "");
 
 
-                        String args = "-s untrusted_app -t uhid_device -c chr_file -p write,read -l";
+                        String args = "-s untrusted_app -t uhid_device -c chr_file -p append,write,read,ioctl,getattr,lock,open -l";
                         String command = sePolicyLocation + " " + args;*/
                         // TODO: try supolicy instead of seinject.  I still can't write to the device
                         // If it works remove all sepolicy-inject functionality
-                        String command = "supolicy --live 'allow untrusted_app uhid_device chr_file {write, read, ioctl}'";
+                        //String command = "supolicy --live " + //"'allow untrusted_app uhid_device dir { ioctl read getattr search open }' " +
+                        //                "'allow untrusted_app uhid_device chr_file { write, read, ioctl, getattr, lock, append, open }'";
+                        String command =  "setenforce Permissive";
                         List<String> output = Shell.SU.run(command);
                         Log.d(TAG, "sepolicy-inject output:");
                         for (String o: output) {
@@ -132,6 +138,9 @@ public class ResRemoteService extends Service {
         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
         boolean firstrun = sharedPrefs.getBoolean("pref_key_first_run", true);
         if (firstrun) {
+            //TODO:  if we are using sepolicy-inject then uncomment this, otherwise remove this
+            //       functionality as its not necessary
+
             copySepolicyInject();
             sharedPrefs.edit().putBoolean("pref_key_first_run", false).apply();
         }
@@ -155,8 +164,8 @@ public class ResRemoteService extends Service {
         IntentFilter filter = new IntentFilter(getString(R.string.ACTION_STOP_SERVICE));
         registerReceiver(mStopReceiver, filter);
 
-        Intent stopIntent = new Intent(getString(R.string.ACTION_STOP_SERVICE))
-                .setClass(this, ResRemoteService.StopReciever.class);
+        Intent stopIntent = new Intent(getString(R.string.ACTION_STOP_SERVICE));
+
         PendingIntent stopPendingIntent = PendingIntent.getBroadcast(this, R.integer.REQUEST_STOP_SERVICE,
                 stopIntent, 0);
 
@@ -226,6 +235,22 @@ public class ResRemoteService extends Service {
     @Override
     public void onDestroy() {
 
+        // re-enable SELinux policies
+        if(policiesRelaxed) {
+            //String command =
+            //        "supolicy --live 'deny appdomain uhid_device chr_file { write, read, ioctl, getattr, lock, append, open }'";
+            //TODO: determine which policies need to be deleted
+            String command = "setenforce Enforcing";
+            List<String> output = Shell.SU.run(command);
+            Log.d(TAG, "sepolicy-inject output:");
+            for (String o: output) {
+                Log.d(TAG, o);
+            }
+
+            policiesRelaxed = false;
+
+        }
+
         unregisterReceiver(mStopReceiver);
         if (arduino != null) {
             arduino.disconnect();
@@ -237,6 +262,7 @@ public class ResRemoteService extends Service {
 
     }
 
+    //TODO:  Keep bottom 3 functions or delete?
     /**Copies sepolicy-inject binary from assets to private storage and sets it
      * as executable so we can change policies if necessary
      */

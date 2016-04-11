@@ -16,6 +16,7 @@ static int uinp_fd;			// uinput file descriptor
 bool isTouching = false;
 int prevXCoord = 0;
 int prevYCoord = 0;
+const int coordOffset = 5;  // The number of pixels a tool must travel before the touch is registered
 const int trackingID = 9000;
 
 
@@ -106,14 +107,13 @@ extern "C" {
 			else {					// holding
 				bool coordChanged = false;  // we need to send a sync event if something has changed
 
-				//TODO: I should probably use a percentage here.  Within 1%?
-				if (x != prevXCoord) {
+				if ((x < (prevXCoord - coordOffset)) || (x > (prevXCoord + coordOffset))) {
 					send_event(EV_ABS, ABS_MT_POSITION_X, x);
 					prevXCoord = x;
 					coordChanged = true;
 				}
 
-				if (y != prevYCoord) {
+				if ((y < (prevYCoord - coordOffset)) || (y > (prevYCoord + coordOffset))) {
 					send_event(EV_ABS, ABS_MT_POSITION_Y, y);
 					prevYCoord = y;
 					coordChanged = true;
@@ -129,7 +129,6 @@ extern "C" {
 		else if (strncmp(cmd, "UP", 2) == 0) {	// command finger up
 			isTouching = false;
 
-			// TODO: we are trying -1 first, if that doesn't work we'll try 0xFFFFFFFF
 			send_event(EV_ABS, ABS_MT_TRACKING_ID, -1);
 			send_event(EV_SYN, SYN_REPORT, 0);
 				
@@ -152,8 +151,6 @@ extern "C" {
 }
 #endif
 
-// TODO:  Intially I will try executing commands one at a time with this function.  If
-//		  it isn't working well we'll try writing events in batches via an array of input_events
 void send_event(int type, int code, int value) {
 	struct input_event ev;
 	memset(&ev, 0, sizeof(ev));

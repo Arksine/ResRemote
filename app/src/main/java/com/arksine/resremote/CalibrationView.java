@@ -36,7 +36,7 @@ public class CalibrationView extends View {
 
 	public void setDrawables(Point P1, Point P2, Point P3, int shapeSize) {
 
-		// TODO: Paths are drawn in wrong place
+		// TODO: Draw paths one at a time, depending on the point
 
 		int shapeHalf = shapeSize / 2;
 		Path cross =  new Path();
