@@ -113,6 +113,8 @@ public class ArduinoCom implements Runnable{
                 PreferenceManager.getDefaultSharedPreferences(mContext);
 
         mConnected = connect(sharedPrefs);
+        //TODO: we need to break here, as at times we are somehow dereferencing a null inputstream
+        //      (or we are reading/writing to one)
 
         InputStream tmpIn = btManager.getInputStream();
         OutputStream tmpOut = btManager.getOutputStream();

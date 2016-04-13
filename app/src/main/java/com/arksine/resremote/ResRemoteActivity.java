@@ -167,7 +167,7 @@ public class ResRemoteActivity extends Activity {
             CharSequence[] entries;
             CharSequence[] entryValues;
 
-            if (mAdapterList.isEmpty()) {
+            if (mAdapterList == null || mAdapterList.isEmpty()) {
                 Log.i(TAG, "No compatible bluetooth devices found on system");
                 entries = new CharSequence[1];
                 entryValues = new CharSequence[1];

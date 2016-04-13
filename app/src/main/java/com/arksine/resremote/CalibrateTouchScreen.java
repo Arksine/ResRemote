@@ -192,8 +192,7 @@ public class CalibrateTouchScreen extends Activity {
 
 
         setContentView(R.layout.activity_calibrate_touch_screen);
-        calView = (CalibrationView) findViewById(R.id.CalView
-        );
+        calView = (CalibrationView) findViewById(R.id.CalView);
 
         localBroadcast = LocalBroadcastManager.getInstance(this);
 
@@ -204,7 +203,7 @@ public class CalibrateTouchScreen extends Activity {
 
         getShapeSize();
 
-        // TODO:  need to create a button on the showcase that exits the app.  Also the showcase
+        // TODO:  need to create a button listener that exits the app.  Also the showcase
         //        doesn't initialll show on the whole screen, likely because there is a delay when
         //        hiding the bars.  Need to fix this.
         showcase = new ShowcaseView.Builder(this)

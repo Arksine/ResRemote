@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <integer name="REQUEST_ENABLE_BT">6001</integer>
+</resources>

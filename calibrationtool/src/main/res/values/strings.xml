@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">CalibrationTool</string>
+
+    <string name="pref_select_device_type">Select Device Type</string>
+    <string-array name="pref_select_device_type_entries">
+        <item>Bluetooth uInput</item>
+        <item>Bluetooth HID</item>
+        <item>USB HID</item>
+    </string-array>
+    <string-array name="pref_select_device_type_values">
+        <item>BT_UINPUT</item>
+        <item>BT_HID</item>
+        <item>USB_HID</item>
+    </string-array>
+    <string name="pref_select_device_type_default">BT_UINPUT</string>
+
+    <string name="pref_select_device">Select Device</string>
+    <string-array name="pref_select_device_entries">
+        <item>No Device Selected</item>
+    </string-array>
+    <string-array name="pref_select_device_values">
+        <item>NO_DEVICE</item>
+    </string-array>
+    <string name="pref_select_device_default">NO_DEVICE</string>
+
+    <string name="pref_start_calibration">Start Calibration</string>
+    <string name="title_activity_calibrate_touch">CalibrateTouchActivity</string>
+
+    <!-- Showcaseview strings-->
+    <string name="cal_title">Touch Screen Calibration</string>
+    <string name="cal_text">Please touch the indicated point</string>
+    <string name="cal_pressure_title">Pressure Calibration</string>
+    <string name="cal_pressure_text">Touch the screen, slowly increasing pressure</string>
+    <string name="cal_finshed_title">Calibration Complete!</string>
+    <string name="cal_finished_text">Window will automatically close momentarily</string>
+</resources>
