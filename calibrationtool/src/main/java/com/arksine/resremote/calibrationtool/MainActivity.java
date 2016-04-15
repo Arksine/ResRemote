@@ -27,14 +27,13 @@ public class MainActivity extends AppCompatActivity {
 
     public static class SettingsFragment extends PreferenceFragment {
 
-        private BluetoothHelper mBtHelper;
-        //TODO:  need a usb manager as well
+        private SerialHelper mSerialHelper;
 
         @Override
         public void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
 
-            mBtHelper = new BluetoothHelper(getActivity());
+
 
             // Load the preferences from an XML resource
             addPreferencesFromResource(R.xml.preferences);
@@ -46,21 +45,9 @@ public class MainActivity extends AppCompatActivity {
                     (ListPreference) root.findPreference("pref_key_select_device");
             PreferenceScreen startCalibrationPref  =
                     (PreferenceScreen) root.findPreference("pref_key_start_calbration") ;
-            // TODO: enumerate the device list based on the Device Type selected
-            String deviceType = selectDeviceTypePref.getValue();
-            ArrayList<String> deviceList;
-            if (deviceType.equals("BT_UINPUT") || deviceType.equals("BT_HID")) {
-                deviceList = mBtHelper.enumerateDevices();
-            }
-            else if (deviceType.equals("USB_HID")) {
-                //TODO: enumerate USB devices to list here
-            }
-            else {
-                // unsuppored device type, create an empty list so we don't cause an error
-                deviceList = new ArrayList<>(1);
-            }
 
-            //populateDeviceListView(deviceList, selectDevicePref);
+            String deviceType = selectDeviceTypePref.getValue();
+            populateDeviceListView(deviceType);
 
             selectDeviceTypePref.setSummary(selectDeviceTypePref.getEntry());
             selectDevicePref.setSummary(selectDevicePref.getEntry());
@@ -76,7 +63,7 @@ public class MainActivity extends AppCompatActivity {
                     int index = list.findIndexOfValue((String)newValue);
                     preference.setSummary(entries[index]);
 
-                    // TODO: Update the DeviceList based on the device type selected here
+                    populateDeviceListView((String)newValue);
 
                     return true;
                 }
@@ -106,8 +93,24 @@ public class MainActivity extends AppCompatActivity {
 
         }
 
-        private void populateDeviceListView(ArrayList<String> deviceList,
-                                            ListPreference selectDevicePref) {
+        private void populateDeviceListView(String deviceType) {
+
+            PreferenceScreen root = this.getPreferenceScreen();
+            ListPreference selectDevicePref =
+                    (ListPreference) root.findPreference("pref_key_select_device");
+
+            ArrayList<String> deviceList;
+            switch (deviceType) {
+                case "BT_UINPUT":  //TODO: need to determine if I need different functionality for uinput and hid bluetooth
+                case "BT_HID":
+                    mSerialHelper = new BluetoothHelper(getActivity());
+                    break;
+                case "USB_HID":
+                    mSerialHelper = new UsbHelper(getActivity());
+                    break;
+            }
+
+            deviceList = mSerialHelper.enumerateDevices();
 
             CharSequence[] entries;
             CharSequence[] entryValues;

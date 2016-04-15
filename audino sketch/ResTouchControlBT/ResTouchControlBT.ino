@@ -67,27 +67,27 @@ void checkCommand() {
     // no command received
     return;
   }
-  else if (command == "<START>") {
+  else if (command == "START") {
     // start main loop
     start = true;
   }
-  else if (command == "<STOP>") {
+  else if (command == "STOP") {
     start = false;
   }
-  else if (command == "<CAL_POINT>") {
+  else if (command == "CAL_POINT") {
     // Get a single point from the touch screen and send it
     start = false;
     //Serial.print("<LOG:GET_POINT_OK>");
     getPoint();
   }
-  else if (command == "<CAL_PRESSURE>") {
+  else if (command == "CAL_PRESSURE") {
     // Get points until the user lifts their finger
     start = false;
     //Serial.print("<LOG:GET_PRESSURE_OK>");
     delay(500);
     getPressure();
   }
-  else if (command == "<TOGGLE_TS>") {
+  else if (command == "TOGGLE_TS") {
     // TODO: Bring whichever pin is connected to touchscreen to high here
   }
   else {
@@ -105,13 +105,21 @@ void checkCommand() {
 String getCommand() {
   String command = "";
   
-  while (Serial.available() > 0)
+  if (Serial.available() > 0)
   {
-    delay(2);
     char c = Serial.read();
-    command += c;
+    
+    //valid command, get the string
+    if (c == '<') {
+      delay(2);
+      c = Serial.read();
+      while (c != '>') {
+        command += c;
+        delay(2);
+        c = Serial.read();
+      }
+    }
   }
-
   return command;
 }
 

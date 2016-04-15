@@ -392,9 +392,6 @@ public class ArduinoCom implements Runnable{
             ardMsg = null;
         }
 
-
-
-
         return ardMsg;
     }
 

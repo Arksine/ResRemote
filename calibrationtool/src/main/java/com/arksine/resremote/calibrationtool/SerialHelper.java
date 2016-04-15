@@ -3,7 +3,7 @@ package com.arksine.resremote.calibrationtool;
 import java.util.ArrayList;
 
 /**
- * Created by Eric on 4/12/2016.
+ * Interface for basic serial device functionality
  */
 public interface SerialHelper {
 

@@ -3,6 +3,7 @@ package com.arksine.resremote.calibrationtool;
 import android.annotation.SuppressLint;
 import android.app.ActionBar;
 import android.content.Context;
+import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -16,9 +17,13 @@ import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.view.Display;
 import android.view.View;
+import android.widget.Button;
+import android.widget.Toast;
 
 import com.github.amlcurran.showcaseview.ShowcaseDrawer;
 import com.github.amlcurran.showcaseview.ShowcaseView;
+import com.github.amlcurran.showcaseview.targets.PointTarget;
+import com.github.amlcurran.showcaseview.targets.Target;
 
 public class CalibrateTouchActivity extends AppCompatActivity {
 
@@ -40,7 +45,11 @@ public class CalibrateTouchActivity extends AppCompatActivity {
     private int mShapeSize;              // Size of the shapes to draw on the view
 
     ShowcaseView mShowcase;
-    private volatile boolean showcaseReady = false;
+
+
+
+    ArduinoCom mArduino;
+    ArduinoCom.OnItemReceivedListener mItemReceivedListener;
 
     private final Runnable mHideRunnable = new Runnable() {
         @SuppressLint("InlinedApi")
@@ -61,9 +70,65 @@ public class CalibrateTouchActivity extends AppCompatActivity {
 
             // build the showcase view after everything is hidden
             buildShowcase();
-            showcaseReady = true;
+            mArduino.connect(mItemReceivedListener);
         }
     };
+
+    private final Runnable exitActivityRunnable = new Runnable() {
+        @Override
+        public void run() {
+            exitActivity();
+        }
+    };
+
+    // TODO: Draw Points points on the view as the showcase moves rather than draw them all
+    //       initially
+    /**
+     *  Start Runnables for UI updates (they are executed in another thread)
+     */
+    private final Runnable uiStartRunnable = new Runnable() {
+        @Override
+        public void run() {
+            mDevicePoints = new Point[NUMPOINTS];
+            getDevicePoints();
+            mCalView.setDrawables(mDevicePoints[0], mDevicePoints[1], mDevicePoints[2],
+                    mShapeSize);
+            mCalView.invalidate();
+            PointTarget target = new PointTarget(mDevicePoints[0]);
+            //showcase.setShouldCentreText(true);
+            mShowcase.setShowcase(target, true);
+        }
+    };
+
+    private final Runnable uiMovePointRunnable = new Runnable() {
+        @Override
+        public void run() {
+            PointTarget target = new PointTarget(mDevicePoints[mPointIndex]);
+            mShowcase.setShowcase(target, true);
+        }
+    };
+
+    private final Runnable uiPressureRunnable = new Runnable() {
+        @Override
+        public void run() {
+            PointTarget target = new PointTarget(mCenterPoint);
+            mShowcase.setShowcase(target, true);
+            mShowcase.setContentTitle(getString(R.string.cal_pressure_title));
+            mShowcase.setContentText(getString(R.string.cal_pressure_text));
+        }
+    };
+
+    private final Runnable uiFinishedRunnable = new Runnable() {
+        @Override
+        public void run() {
+            mShowcase.setTarget(Target.NONE);
+            mShowcase.setContentTitle(getString(R.string.cal_finshed_title));
+            mShowcase.setContentText(getString(R.string.cal_finished_text));
+        }
+    };
+    /**
+     * End Runnables for UI updates
+     */
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,28 +137,98 @@ public class CalibrateTouchActivity extends AppCompatActivity {
         setContentView(R.layout.activity_calibrate_touch);
         mCalView = (CalibrationView) findViewById(R.id.CalView);
 
+        /**
+         * Override a listener so we can react to events from the touchscreen
+         */
+        mItemReceivedListener = new ArduinoCom.OnItemReceivedListener() {
+            @Override
+            public void onStartReceived(boolean connectionStatus) {
+
+                if (connectionStatus) {
+                    // device ready, show UI and start the arudino thread
+                    runOnUiThread(uiStartRunnable);
+                    mArduino.start();
+                }
+                else {
+                    // unable to connect to device
+                    Toast.makeText(getApplicationContext(), "Error connecting to device, exiting",
+                            Toast.LENGTH_SHORT).show();
+                    mEventHandler.postDelayed(exitActivityRunnable, 3000);
+                }
+            }
+
+            @Override
+            public void onPointReceived(int pointIndex) {
+
+                switch (pointIndex) {
+                    case 0:
+                    case 1:
+                        mPointIndex = pointIndex + 1;
+                        runOnUiThread(uiMovePointRunnable);
+                        break;
+                    case 2:
+                        runOnUiThread(uiPressureRunnable);
+                }
+            }
+
+            @Override
+            public void onPressureReceived(boolean success) {
+                if (success) {
+                    runOnUiThread(uiFinishedRunnable);
+                } else {
+                    // unable to connect to device
+                    Toast.makeText(getApplicationContext(), "Error receiving pressure, exiting",
+                            Toast.LENGTH_SHORT).show();
+                    mArduino.disconnect();
+                    mEventHandler.postDelayed(exitActivityRunnable, 3000);
+                }
+            }
+
+            @Override
+            public void onFinished(boolean success) {
+                if (!success) {
+                    // error writing calibration values to arduino
+                    Toast.makeText(getApplicationContext(), "Error writing calibration values to arduino",
+                            Toast.LENGTH_SHORT).show();
+                }
+                mArduino.disconnect();
+                mEventHandler.postDelayed(exitActivityRunnable, 3000);
+            }
+        };
+
+        // Lock orientation to landscape mode
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+
+        mArduino = new ArduinoCom(this);
         getDevicePoints();
         hide();
 
     }
-
-    // TODO: need a function or broadcast receiver that moves to the next point when ready
 
     private void exitActivity(){
         this.finish();
     }
 
     private void buildShowcase() {
-        // TODO:  need to create a button listener that exits the app.  Also the showcase
-        //        doesn't initially show on the whole screen, likely because there is a delay when
-        //        hiding the bars.  Need to fix this.
+
+        Button.OnClickListener btnListener = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Exit the activity
+                mArduino.disconnect();
+                exitActivity();
+            }
+        };
+
         mShowcase = new ShowcaseView.Builder(this)
                 .setShowcaseDrawer(new CalShowcaseDrawer(mShapeSize / 2))
                 .setStyle(R.style.CalibrationShowcaseStyle)
                 .setContentTitle(R.string.cal_title)
                 .setContentText(R.string.cal_text)
                 .blockAllTouches()
+                .setOnClickListener(btnListener)
                 .build();
+        mShowcase.setButtonText(getString(R.string.cal_button_text));
     }
 
     private void hide() {

@@ -50,10 +50,14 @@ public class BluetoothHelper implements SerialHelper {
 
                     if (state == BluetoothAdapter.STATE_TURNING_ON) {
                         Toast.makeText(mContext, "Bluetooth Turning On", Toast.LENGTH_SHORT).show();
+                    } else if (state == BluetoothAdapter.STATE_ON) {
+
+                        // TODO: Broadcast an intent back to the main activity telling it to repopulate the device list
                     }
 
                 }
             }
+
         }
     };
 
@@ -160,15 +164,83 @@ public class BluetoothHelper implements SerialHelper {
         return mAdapterList;
     }
 
+
+
     /**
-     * Runnable for connecting a device and creating its input and output streams.
+     * Retrieves a bluetooth socket from a specified device.  WARNING: This function is blocking, do
+     * not call from the UI thread!
+     * @param macAddr - The mac address of the device to connect
      */
-    private class ConnectDeviceRunnable implements Runnable {
+    public void connectDevice (String macAddr,  SerialHelper.DeviceReadyListener readyListener) {
+
+        if (!isBluetoothOn()) {
+            readyListener.OnDeviceReady(false);
+            return;
+        }
+
+        ConnectionThread btConnectThread = new ConnectionThread(macAddr, readyListener);
+        btConnectThread.start();
+
+    }
+
+    public void closeBluetoothSocket() {
+
+        if (mSocket != null) {
+            try {
+                mSocket.close();
+            }
+            catch (IOException e) {
+                Log.e(TAG, "Unable to close Socket", e);
+            }
+        }
+    }
+
+    public boolean isDeviceConnected() {
+
+        return deviceConnected;
+    }
+
+    public boolean writeData(String data) {
+
+        if (mSocket == null) return false;
+
+        byte[] bytes = data.getBytes();
+
+        try {
+            serialOut.write(bytes);
+        } catch(IOException e) {
+            Log.e(TAG, "Error writing to device", e);
+            // Error sending the start command to the arduino
+            return false;
+        }
+        return true;
+    }
+
+    public byte readByte() {
+
+        if (mSocket == null) return 0;
+
+        byte input;
+        try {
+            input = (byte)serialIn.read();
+        }
+        catch (IOException e){
+            Log.d(TAG, "Error reading from device", e);
+            input = 0;
+        }
+
+        return input;
+    }
+
+    /**
+     * Thread for connecting a device and creating its input and output streams.
+     */
+    private class ConnectionThread extends Thread{
 
         private String macAddr;
         private SerialHelper.DeviceReadyListener readyListener;
 
-        public ConnectDeviceRunnable(String macAddr, SerialHelper.DeviceReadyListener readyListener) {
+        public ConnectionThread(String macAddr, SerialHelper.DeviceReadyListener readyListener) {
             this.macAddr = macAddr;
             this.readyListener = readyListener;
         }
@@ -239,66 +311,5 @@ public class BluetoothHelper implements SerialHelper {
 
             readyListener.OnDeviceReady(deviceConnected);
         }
-    }
-
-    /**
-     * Retrieves a bluetooth socket from a specified device.  WARNING: This function is blocking, do
-     * not call from the UI thread!
-     * @param macAddr - The mac address of the device to connect
-     */
-    public void connectDevice (String macAddr,  SerialHelper.DeviceReadyListener readyListener) {
-
-        if (!isBluetoothOn()) {
-            readyListener.OnDeviceReady(false);
-            return;
-        }
-
-        ConnectDeviceRunnable deviceRunnable = new ConnectDeviceRunnable(macAddr, readyListener);
-        Thread connectDeviceThread = new Thread (deviceRunnable);
-        connectDeviceThread.start();
-
-    }
-
-    public void closeBluetoothSocket() {
-
-        if (mSocket != null) {
-            try {
-                mSocket.close();
-            }
-            catch (IOException e) {
-                Log.e(TAG, "Unable to close Socket", e);
-            }
-        }
-    }
-
-    public boolean isDeviceConnected() {
-
-        return deviceConnected;
-    }
-
-    public boolean writeData(String data) {
-        byte[] bytes = data.getBytes();
-
-        try {
-            serialOut.write(bytes);
-        } catch(IOException e) {
-            Log.e(TAG, "Error writing to device", e);
-            // Error sending the start command to the arduino
-            return false;
-        }
-        return true;
-    }
-
-    public byte readByte() {
-        byte input;
-        try {
-            input = (byte)serialIn.read();
-        }
-        catch (IOException e){
-            Log.d(TAG, "Error reading from device", e);
-            input = 0;
-        }
-
-        return input;
     }
 }
