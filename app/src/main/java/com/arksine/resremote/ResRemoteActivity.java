@@ -1,25 +1,21 @@
 package com.arksine.resremote;
 
 import android.app.Activity;
-import android.app.Notification;
-import android.app.PendingIntent;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
+
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
 import android.preference.PreferenceScreen;
 import android.util.Log;
 import android.widget.Toast;
 
 import java.util.ArrayList;
-import java.util.Set;
 
+
+// TODO: I could add USB support as well.
 public class ResRemoteActivity extends Activity {
 
     private static String TAG = "ResRemoteActivity";
@@ -130,32 +126,7 @@ public class ResRemoteActivity extends Activity {
                 @Override
                 public boolean onPreferenceClick(Preference preference) {
 
-                    // Set isCalibrated shared preference to false and launch service
-                    Context mContext = getActivity();
-                    SharedPreferences sharedPrefs =
-                            PreferenceManager.getDefaultSharedPreferences(mContext);
-
-                    // set the is_x_calibrated preference to false, depending on orientation
-                    String orientation = sharedPrefs.getString("pref_key_select_orientation", "Landscape");
-                    switch (orientation) {
-                        case "Landscape":
-                            sharedPrefs.edit().putBoolean("pref_key_is_landscape_calibrated", false).apply();
-                            break;
-                        case "Portrait":
-                            sharedPrefs.edit().putBoolean("pref_key_is_portrait_calibrated", false).apply();
-                            break;
-                        case "Dynamic":
-                            sharedPrefs.edit().putBoolean("pref_key_is_landscape_calibrated", false).apply();
-                            sharedPrefs.edit().putBoolean("pref_key_is_portrait_calibrated", false).apply();
-                            break;
-                        default:
-                            // Error: invalid orientation
-                            Log.e(TAG, "Invalid orientation selected");
-                            break;
-                    }
-
-                    Intent startIntent = new Intent(mContext, ResRemoteService.class);
-                    mContext.startService(startIntent);
+                    //TODO: Launch calibration application
                     return true;
                 }
             });

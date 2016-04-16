@@ -16,7 +16,7 @@ static int uinp_fd;			// uinput file descriptor
 bool isTouching = false;
 int prevXCoord = 0;
 int prevYCoord = 0;
-const int coordOffset = 5;  // The number of pixels a tool must travel before the touch is registered
+const int coordOffset = 3;  // The number of pixels a tool must travel before the touch is registered
 const int trackingID = 9000;
 
 

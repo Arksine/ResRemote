@@ -20,17 +20,6 @@ public class NativeInput {
 
     private static String TAG = "NativeInput";
 
-    // coordinate converson coefficients
-    private float A;
-    private float B;
-    private float C;
-    private float D;
-    private float E;
-    private float F;
-
-    private int pressureOffset;
-    private float pressureCoef;
-
     int rotation;
     int xMax;
     int yMax;
@@ -45,38 +34,20 @@ public class NativeInput {
         System.loadLibrary("restouchdrv");
     }
 
-    NativeInput(float A, float B, float C, float D, float E, float F,
-                int zResistanceMin, int zResistanceMax, int screenSizeX, int screenSizeY, int rotation) {
+    NativeInput(int screenSizeX, int screenSizeY, int rotation) {
 
-        Log.i(TAG, "A coefficient: " + A);
-        Log.i(TAG, "B coefficient: " + B);
-        Log.i(TAG, "C coefficient: " + C);
-        Log.i(TAG, "D coefficient: " + D);
-        Log.i(TAG, "E coefficient: " + E);
-        Log.i(TAG, "F coefficient: " + F);
 
-        setupVirtualDevice(A, B, C, D, E, F, zResistanceMin, zResistanceMax, screenSizeX, screenSizeY, rotation);
+        setupVirtualDevice(screenSizeX, screenSizeY, rotation);
 
     }
 
-    public void setupVirtualDevice(float A, float B, float C, float D, float E, float F,
-            int zResistanceMin, int zResistanceMax, int screenSizeX, int screenSizeY, int rotation) {
+    public void setupVirtualDevice(int screenSizeX, int screenSizeY, int rotation) {
 
         grantUinputPrivs();
-
-        this.A = A;
-        this.B = B;
-        this.C = C;
-        this.D = D;
-        this.E = E;
-        this.F = F;
 
         this.rotation = rotation;
         xMax = screenSizeX - 1;
         yMax = screenSizeY - 1;
-
-        calibratePressure(zResistanceMin, zResistanceMax);
-
 
         // TODO:  I may not need to close and reopen the the device when the orientation changes.
         //        its possible that android changes the x and y values for me.
@@ -100,24 +71,6 @@ public class NativeInput {
         else {
             Log.e(TAG, "/dev/input does not exist on your device");
         }
-
-    }
-
-	/**
-     * Calculates the coefficient required to convert the R-touch (resitance between the x and y
-     * screen layers) to ABS_MT_PRESSURE.  Resistance is the inverse of pressure, the lower the
-     * resistance the higher the pressure
-     *
-     * @param zResistanceMin
-     * @param zResistanceMax
-     */
-    private void calibratePressure(int zResistanceMin, int zResistanceMax) {
-
-        // zResistanceMin is proportional to ABS_MT_PRESSURE = 255;
-        // zResistanceMax is proportional to ABS_MT_PRESSURE = 0;
-
-        pressureOffset = zResistanceMin;
-        pressureCoef = 256 / (zResistanceMax - zResistanceMin);
     }
 
     public void processInput(String command, TouchPoint screenCoord) {
@@ -128,7 +81,7 @@ public class NativeInput {
     }
 
     /**
-     * Calculates a coordinate on the device given a touchscreen coordinate
+     * Calculates translates coordinates based on device rotation
      *
      * @param screenCoord - coordinate received from the resistive touch screen
      * @return deviceCoord - converted device coordinate
@@ -140,35 +93,33 @@ public class NativeInput {
         int y;
         int z;
 
-        //  TODO: each rotation needs coordinates set differently.  Uinput assumes the
-        //        initial rotation is Zero, so we need to remap x and y according to our current
-        //        rotation
+
         if (rotation == Surface.ROTATION_0) {  // Portrait default
-            x = Math.round((A * screenCoord.getX()) + (B * screenCoord.getY()) + C);
-            y = Math.round((D * screenCoord.getX()) + (E * screenCoord.getY()) + F);
+            x = screenCoord.getX();
+            y = screenCoord.getY();
         }
         else if(rotation == Surface.ROTATION_180){  // portrait flipped (x and y are inverted)
-            x = xMax - Math.round((A * screenCoord.getX()) + (B * screenCoord.getY()) + C);
-            y = yMax - Math.round((D * screenCoord.getX()) + (E * screenCoord.getY()) + F);
+            x = xMax - screenCoord.getX();
+            y = yMax - screenCoord.getY();
         }
         else if (rotation == Surface.ROTATION_90){ // landscape normal
-            y = Math.round((A * screenCoord.getX()) + (B * screenCoord.getY()) + C);
-            x = xMax - Math.round((D * screenCoord.getX()) + (E * screenCoord.getY()) + F);
+            y = screenCoord.getX();
+            x = xMax - screenCoord.getY();
 
         }
         else if (rotation == Surface.ROTATION_270) { // landscape inverted
-            y = yMax - Math.round((A * screenCoord.getX()) + (B * screenCoord.getY()) + C);
-            x = Math.round((D * screenCoord.getX()) + (E * screenCoord.getY()) + F);
+            y = yMax - screenCoord.getX();
+            x = screenCoord.getY();
         }
         else {
             // invalid rotation
-            x = Math.round((A * screenCoord.getX()) + (B * screenCoord.getY()) + C);
-            y = Math.round((D * screenCoord.getX()) + (E * screenCoord.getY()) + F);
+            x = screenCoord.getX();
+            y = screenCoord.getY();
         }
 
-        z = Math.round(255 - ((screenCoord.getZ() - pressureOffset) * pressureCoef));
+        z = screenCoord.getZ();
 
-        //Log.d(TAG, "Translated coord - x:" + x + " y:" + y);
+        //Log.d(TAG, "Translated coord: x:" + x + " y:" + y);
         deviceCoord = new TouchPoint(x, y, z);
         return deviceCoord;
     }
@@ -188,9 +139,9 @@ public class NativeInput {
     private void grantUinputPrivs() {
 
         String command = "chmod a+rw /dev/uinput";
-        List<String> output =  Shell.SU.run(command);
+        Shell.SU.run(command);
 
-        output = Shell.SU.run("ls -l /dev/uinput");
+        List<String> output = Shell.SU.run("ls -l /dev/uinput");
         Log.i(TAG, "SU output:");
         for (String line : output) {
             Log.i(TAG, line);

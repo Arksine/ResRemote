@@ -21,7 +21,6 @@
         android:entryValues="@array/pref_select_orientation_values"
         android:persistent="true"
         android:defaultValue="Landscape" />
-
     <PreferenceScreen
         android:key="pref_key_calibrate"
         android:title="@string/pref_calibrate" >

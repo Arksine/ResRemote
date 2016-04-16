@@ -188,8 +188,15 @@ public class CalibrateTouchActivity extends AppCompatActivity {
             public void onFinished(boolean success) {
                 if (!success) {
                     // error writing calibration values to arduino
-                    Toast.makeText(getApplicationContext(), "Error writing calibration values to arduino",
-                            Toast.LENGTH_SHORT).show();
+                    // TODO: Need to create a runnable for this and run on UI thread
+                    Runnable toast = new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast.makeText(getApplicationContext(), "Error writing calibration values to arduino",
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    };
+                   runOnUiThread(toast);
                 }
                 mArduino.disconnect();
                 mEventHandler.postDelayed(exitActivityRunnable, 3000);
@@ -200,6 +207,7 @@ public class CalibrateTouchActivity extends AppCompatActivity {
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 
         mArduino = new ArduinoCom(this);
+        mDevicePoints = new Point[3];
         getDevicePoints();
         hide();
 
@@ -262,9 +270,9 @@ public class CalibrateTouchActivity extends AppCompatActivity {
         mDevicePoints[2] = new Point((xOffset - 1), (yOffset - 1));
 
         // Shapesize is 10% of the screenwidth or height, whichever is the smallest
-        mShapeSize = maxSize.x;
-        if (maxSize.y < mShapeSize) {
-            mShapeSize = maxSize.y;
+        mShapeSize = maxSize.x / 10;
+        if (maxSize.y < mShapeSize / 10) {
+            mShapeSize = maxSize.y / 10;
         }
 
         // Dead center of the screen

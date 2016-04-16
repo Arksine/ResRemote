@@ -4,6 +4,8 @@
         android:key="pref_key_select_device_type"
         android:title="@string/pref_select_device_type"
         android:dialogTitle="@string/pref_select_device_type"
+        android:entries="@array/pref_select_device_type_entries"
+        android:entryValues="@array/pref_select_device_type_values"
         android:persistent="true"
         android:defaultValue="@string/pref_select_device_type_default" />
     <ListPreference

@@ -115,10 +115,10 @@ public class ArduinoCom extends Thread{
         byte ch;
 
         // get the first byte, anything other than a '<' is trash and will be ignored
-        while((ch = mSerialHelper.readByte()) != '<');
+        while((ch = mSerialHelper.readByte()) != '<' && mRunning);
 
         // First byte is good, capture the rest until we get to the end of the message
-        while ((ch = mSerialHelper.readByte()) != '>') {
+        while ((ch = mSerialHelper.readByte()) != '>' && mRunning) {
             buffer[bytes] = ch;
             bytes++;
         }
@@ -330,37 +330,30 @@ public class ArduinoCom extends Thread{
 
         F = D3.y - (D * T3.x) - (E * T3.y);
 
+        Log.i(TAG, "A coefficient: " + A);
+        Log.i(TAG, "B coefficient: " + B);
+        Log.i(TAG, "C coefficient: " + C);
+        Log.i(TAG, "D coefficient: " + D);
+        Log.i(TAG, "E coefficient: " + E);
+        Log.i(TAG, "F coefficient: " + F);
+
         // Now calculate the pressure coefficient
         int resDifference = resistance.y - resistance.x;
         float pressureCoef = 255 / resDifference;  // (pressure is 255 - (resistance - resMin)*pressureCoef)
 
         int tmp;  // all floats will be sent as integers, with 3 decimal places of precision
 
-        // tell the arduino that we are ready to store our coefficients
-        mSerialHelper.writeData("<STORE_CALIBRATION>");
-
-        tmp = Math.round(A * 1000);
-        if (!sendCalibrationVariable("<A:" + Integer.toString(tmp) + ">")) return false;
-
-        tmp = Math.round(B * 1000);
-        if (!sendCalibrationVariable("<B:" + Integer.toString(tmp) + ">")) return false;
-
-        tmp = Math.round(C * 1000);
-        if (!sendCalibrationVariable("<C:" + Integer.toString(tmp) + ">")) return false;
-
-        tmp = Math.round(D * 1000);
-        if (!sendCalibrationVariable("<D:" + Integer.toString(tmp) + ">")) return false;
-
-        tmp = Math.round(E * 1000);
-        if (!sendCalibrationVariable("<E:" + Integer.toString(tmp) + ">")) return false;
-
-        tmp = Math.round(F * 1000);
-        if (!sendCalibrationVariable("<F:" + Integer.toString(tmp) + ">")) return false;
-
-        tmp = Math.round(pressureCoef * 1000);
-        if (!sendCalibrationVariable("<R:" + Integer.toString(tmp) + ">")) return false;
-
-        if (!sendCalibrationVariable("<M:" + Integer.toString(resistance.x) +">")) return false;
+        // Send coefficients to the arduino
+        //TODO: send the floats to the arduino in binary rather than as strings.  Use the parse float function
+        //      it will require that I change the writedata function to accept bytes rather than strings
+        if (!sendCalibrationVariable("<$A:" + Float.toString(A) + ">")) return false;
+        if (!sendCalibrationVariable("<$B:" + Float.toString(B) + ">")) return false;
+        if (!sendCalibrationVariable("<$C:" + Float.toString(C) + ">")) return false;
+        if (!sendCalibrationVariable("<$D:" + Float.toString(D) + ">")) return false;
+        if (!sendCalibrationVariable("<$E:" + Float.toString(E) + ">")) return false;
+        if (!sendCalibrationVariable("<$F:" + Float.toString(F) + ">")) return false;
+        if (!sendCalibrationVariable("<$R:" + Float.toString(pressureCoef) + ">")) return false;
+        if (!sendCalibrationVariable("<$M:" + Integer.toString(resistance.x) +">")) return false;
         mSerialHelper.writeData("<WRITE_CALIBRATION>");
 
         return true;
@@ -376,6 +369,8 @@ public class ArduinoCom extends Thread{
             mSerialHelper.writeData("<ERROR>");
             return false;
         } else {
+            ArduinoMessage value = readMessage();
+            Log.i(TAG, value.desc);
             return true;
         }
     }

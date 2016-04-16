@@ -212,7 +212,7 @@ public class ResRemoteService extends Service {
 
         // Stop the current thread if its running, so we can launch a new one (perhaps to calibrate)
         if (arduino != null) {
-            arduino.stop();
+            arduino.disconnect();
         }
 
         Message msg = mServiceHandler.obtainMessage();
