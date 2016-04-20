@@ -25,5 +25,5 @@ dependencies {
     compile 'com.android.support:appcompat-v7:23.2.1'
     compile 'com.android.support:design:23.2.1'
     compile 'com.github.amlcurran.showcaseview:library:5.4.3'
-    compile 'com.github.felHR85:UsbSerial:4.1.1'
+    compile 'com.github.felHR85:UsbSerial:4.2'
 }

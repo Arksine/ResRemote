@@ -28,12 +28,11 @@ public class MainActivity extends AppCompatActivity {
     public static class SettingsFragment extends PreferenceFragment {
 
         private SerialHelper mSerialHelper;
+        private String mDeviceType;
 
         @Override
         public void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
-
-
 
             // Load the preferences from an XML resource
             addPreferencesFromResource(R.xml.preferences);
@@ -41,16 +40,15 @@ public class MainActivity extends AppCompatActivity {
             PreferenceScreen root = this.getPreferenceScreen();
             ListPreference selectDeviceTypePref =
                     (ListPreference) root.findPreference("pref_key_select_device_type");
-            ListPreference selectDevicePref =
+            final ListPreference selectDevicePref =
                     (ListPreference) root.findPreference("pref_key_select_device");
             PreferenceScreen startCalibrationPref  =
-                    (PreferenceScreen) root.findPreference("pref_key_start_calbration") ;
+                    (PreferenceScreen) root.findPreference("pref_key_start_calibration") ;
 
-            String deviceType = selectDeviceTypePref.getValue();
-            populateDeviceListView(deviceType);
+            mDeviceType = selectDeviceTypePref.getValue();
+            populateDeviceListView();
 
             selectDeviceTypePref.setSummary(selectDeviceTypePref.getEntry());
-            selectDevicePref.setSummary(selectDevicePref.getEntry());
 
             /**
              * The listeners below update the preference summary after they have been changed
@@ -63,11 +61,13 @@ public class MainActivity extends AppCompatActivity {
                     int index = list.findIndexOfValue((String)newValue);
                     preference.setSummary(entries[index]);
 
-                    populateDeviceListView((String)newValue);
+                    mDeviceType = (String)newValue;
+                    populateDeviceListView();
 
                     return true;
                 }
             });
+
             selectDevicePref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
                 @Override
                 public boolean onPreferenceChange(Preference preference, Object newValue) {
@@ -85,6 +85,10 @@ public class MainActivity extends AppCompatActivity {
             startCalibrationPref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
                 @Override
                 public boolean onPreferenceClick(Preference preference) {
+                    // Stop the resremote service if it is installed
+                    Intent stopIntent = new Intent(getString(R.string.ACTION_STOP_SERVICE));
+                    getActivity().sendBroadcast(stopIntent);
+
                     Intent startCal = new Intent(getActivity(), CalibrateTouchActivity.class);
                     startActivity(startCal);
                     return true;
@@ -93,14 +97,15 @@ public class MainActivity extends AppCompatActivity {
 
         }
 
-        private void populateDeviceListView(String deviceType) {
+        private void populateDeviceListView() {
 
             PreferenceScreen root = this.getPreferenceScreen();
             ListPreference selectDevicePref =
                     (ListPreference) root.findPreference("pref_key_select_device");
 
+
             ArrayList<String> deviceList;
-            switch (deviceType) {
+            switch (mDeviceType) {
                 case "BT_UINPUT":  //TODO: need to determine if I need different functionality for uinput and hid bluetooth
                 case "BT_HID":
                     mSerialHelper = new BluetoothHelper(getActivity());
@@ -142,6 +147,15 @@ public class MainActivity extends AppCompatActivity {
 
             selectDevicePref.setEntries(entries);
             selectDevicePref.setEntryValues(entryValues);
+
+            // if the currently stored value isn't in the new list, reset the summary
+            int index = selectDevicePref.findIndexOfValue(selectDevicePref.getValue());
+            if (index == -1) {
+                selectDevicePref.setSummary("");
+            }
+            else {
+                selectDevicePref.setSummary(selectDevicePref.getEntry());
+            }
         }
     }
 }

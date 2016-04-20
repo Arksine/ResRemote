@@ -1,3 +1,4 @@
+
 /**
  * ResistiveTouchController
  * 
@@ -6,14 +7,17 @@
 
 #include <TouchScreen.h>
 #include <EEPROMex.h>
+#include <HID-Project.h>
+#include <HID-Settings.h>
+
 
 #define CONFIG_VERSION "rt1"
 #define MEMORYBASE 32 // where to store and retrieve EEPROM memory
 
-#define YP A1  // must be an analog pin, use "An" notation!
-#define XM A2  // must be an analog pin, use "An" notation!
-#define YM 8   // can be a digital pin
-#define XP 9   // can be a digital pin
+#define YP A0   // must be an analog pin, use "An" notation!
+#define XM A1   // must be an analog pin, use "An" notation!
+#define YM A2   // can be a digital pin
+#define XP A3   // can be a digital pin
 
 #define MINPRESSURE 10
 #define MAXPRESSURE 1000
@@ -55,14 +59,15 @@ struct StoreStruct {
 
 
 void setup() {
-  Serial.begin(115200);
-  while (!Serial);
-  Serial.flush();
+  Serial1.begin(115200);
+  while (!Serial1);
+  Serial1.flush();
 
   EEPROM.setMemPool(MEMORYBASE, EEPROMSizeATmega328);
   configAddress  = EEPROM.getAddress(sizeof(StoreStruct)); // Size of config object 
   isCalibrated = loadConfig();
-  
+
+  Digitizer.begin();
 }
 
 void loop() {
@@ -85,7 +90,7 @@ void loop() {
       // I might need to adjust the touch up delay, 50 - 100ms should work
      
         isTouching = false;
-        Serial.print("<UP:0:0:0>");
+        Serial1.print("<UP:0:0:0>");
     }
   }
 
@@ -110,13 +115,13 @@ void sendConvertedCoordinate(int tX, int tY, int tZ) {
     dY = ((storage.D * tX) + (storage.E * tY) + storage.F + 5000l) / 10000l;
     dZ = storage.pressureMax - ((((tZ - storage.resMin) * storage.R) + 5000l) / 10000l);
 
-    Serial.print("<DOWN:");
-    Serial.print(dX);
-    Serial.print(":");
-    Serial.print(dY);
-    Serial.print(":");
-    Serial.print(dZ);
-    Serial.print(">");
+    Serial1.print("<DOWN:");
+    Serial1.print(dX);
+    Serial1.print(":");
+    Serial1.print(dY);
+    Serial1.print(":");
+    Serial1.print(dZ);
+    Serial1.print(">");
   
 }
 
@@ -126,9 +131,9 @@ void sendConvertedCoordinate(int tX, int tY, int tZ) {
  */
 void checkSerial() {
   
-  if (Serial.available() > 0)
+  if (Serial1.available() > 0)
   {
-    char ch = Serial.read();
+    char ch = Serial1.read();
 
     if (ch == '<') {
       // packet is beginning, clear buffer
@@ -169,7 +174,7 @@ void checkPacket() {
       storage.R = 10000;
       storage.pressureMax = MAXPRESSURE;
       storage.resMin = MINPRESSURE;
-      Serial.write("<LOG:Device not calibrated>");
+      Serial1.write("<LOG:Device not calibrated>");
     }
     start = true;
   }
@@ -179,13 +184,13 @@ void checkPacket() {
   else if (serialBuffer == "CAL_POINT") {
     // Get a single point from the touch screen and send it
     start = false;
-    //Serial.print("<LOG:GET_POINT_OK>");
+    //Serial1.print("<LOG:GET_POINT_OK>");
     getPoint();
   }
   else if (serialBuffer == "CAL_PRESSURE") {
     // Get points until the user lifts their finger
     start = false;
-    //Serial.print("<LOG:GET_PRESSURE_OK>");
+    //Serial1.print("<LOG:GET_PRESSURE_OK>");
     delay(500);
     getPressure();
   }
@@ -216,7 +221,7 @@ void checkPacket() {
     logString.replace(">", "]");
     logString.replace(":", "|");
     logString = "<LOG:UKNOWN COMMAND " + logString + ">";
-    Serial.print(logString);
+    Serial1.print(logString);
   }
  
 }
@@ -230,13 +235,13 @@ void getPoint() {
   while (!pointRecd) {
     TSPoint p = ts.getPoint();
     if (p.z > MINPRESSURE && p.z < MAXPRESSURE) {
-      Serial.print("<CAL:");
-      Serial.print(p.x);
-      Serial.print(":");
-      Serial.print(p.y);
-      Serial.print(":");
-      Serial.print(p.z);
-      Serial.print(">");
+      Serial1.print("<CAL:");
+      Serial1.print(p.x);
+      Serial1.print(":");
+      Serial1.print(p.y);
+      Serial1.print(":");
+      Serial1.print(p.z);
+      Serial1.print(">");
       pointRecd = true;
     } 
     delay(10);
@@ -253,13 +258,13 @@ void getPressure () {
     
     TSPoint p = ts.getPoint();
     if (p.z > MINPRESSURE && p.z < MAXPRESSURE) {
-      Serial.print("<CAL:");
-      Serial.print(p.x);
-      Serial.print(":");
-      Serial.print(p.y);
-      Serial.print(":");
-      Serial.print(p.z);
-      Serial.print(">");
+      Serial1.print("<CAL:");
+      Serial1.print(p.x);
+      Serial1.print(":");
+      Serial1.print(p.y);
+      Serial1.print(":");
+      Serial1.print(p.z);
+      Serial1.print(">");
       isTouching = true;
       touchTime = millis();
     
@@ -267,7 +272,7 @@ void getPressure () {
     else if (isTouching && ((millis() - touchTime) >= TOUCHUPDELAY)) {
         touchUp = true;
         isTouching = false;
-        Serial.print("<STOP:0:0:0>");
+        Serial1.print("<STOP:0:0:0>");
     }
     
     delay(10);
@@ -289,66 +294,66 @@ void storeCalibration(String data) {
   if (varType == "A") {
     
     storage.A = atol(value.c_str());
-    Serial.print("<LOG:OK>");
-    Serial.print("<LOG:A="); 
-    Serial.print(storage.A);
-    Serial.print(">");
+    Serial1.print("<LOG:OK>");
+    Serial1.print("<LOG:A="); 
+    Serial1.print(storage.A);
+    Serial1.print(">");
     
   } else if (varType == "B") {
     
     storage.B = atol(value.c_str());
-    Serial.print("<LOG:OK>");
-    Serial.print("<LOG:B="); 
-    Serial.print(storage.B);
-    Serial.print(">");
+    Serial1.print("<LOG:OK>");
+    Serial1.print("<LOG:B="); 
+    Serial1.print(storage.B);
+    Serial1.print(">");
     
   } else if (varType == "C") {
     
     storage.C = atol(value.c_str());
-    Serial.print("<LOG:OK>");
-    Serial.print("<LOG:C="); 
-    Serial.print(storage.C);
-    Serial.print(">");
+    Serial1.print("<LOG:OK>");
+    Serial1.print("<LOG:C="); 
+    Serial1.print(storage.C);
+    Serial1.print(">");
     
   } else if (varType == "D") {
 
     storage.D = atol(value.c_str());
-    Serial.print("<LOG:OK>");
-    Serial.print("<LOG:D="); 
-    Serial.print(storage.D);
-    Serial.print(">");
+    Serial1.print("<LOG:OK>");
+    Serial1.print("<LOG:D="); 
+    Serial1.print(storage.D);
+    Serial1.print(">");
     
   } else if (varType == "E") {
 
     storage.E = atol(value.c_str());
-    Serial.print("<LOG:OK>");
-    Serial.print("<LOG:E="); 
-    Serial.print(storage.E);
-    Serial.print(">");
+    Serial1.print("<LOG:OK>");
+    Serial1.print("<LOG:E="); 
+    Serial1.print(storage.E);
+    Serial1.print(">");
     
   } else if (varType == "F") {
 
     storage.F = atol(value.c_str());
-    Serial.print("<LOG:OK>");
-    Serial.print("<LOG:F="); 
-    Serial.print(storage.F);
-    Serial.print(">");
+    Serial1.print("<LOG:OK>");
+    Serial1.print("<LOG:F="); 
+    Serial1.print(storage.F);
+    Serial1.print(">");
     
   } else if (varType == "R") {
 
     storage.R = atol(value.c_str());
-    Serial.print("<LOG:OK>");
-    Serial.print("<LOG:RESCOEF="); 
-    Serial.print(storage.R);
-    Serial.print(">");   
+    Serial1.print("<LOG:OK>");
+    Serial1.print("<LOG:RESCOEF="); 
+    Serial1.print(storage.R);
+    Serial1.print(">");   
   
   } else if (varType == "M") {
 
     storage.resMin = atoi(value.c_str());
-    Serial.print("<LOG:OK>");
-    Serial.print("<LOG:RESMIN="); 
-    Serial.print(storage.resMin);
-    Serial.print(">");
+    Serial1.print("<LOG:OK>");
+    Serial1.print("<LOG:RESMIN="); 
+    Serial1.print(storage.resMin);
+    Serial1.print(">");
     
   } else {
     // invalid command
@@ -357,7 +362,7 @@ void storeCalibration(String data) {
     logString.replace(">", "]");
     logString.replace(":", "|");
     logString = "<LOG:PACKET " + logString + " invalid>";
-    Serial.print(logString);
+    Serial1.print(logString);
   }
 }
 

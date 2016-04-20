@@ -61,6 +61,7 @@ dependencies {
     compile 'com.android.support:support-v4:23.2.1'
     compile 'eu.chainfire:libsuperuser:1.0.0.+'
     compile 'com.github.amlcurran.showcaseview:library:5.4.3'
+    compile 'com.github.felHR85:UsbSerial:4.2'
 }
 
 def getNdkDir() {

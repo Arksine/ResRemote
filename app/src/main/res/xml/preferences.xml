@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
     <ListPreference
-        android:key="pref_key_select_bt_device"
-        android:title="@string/pref_select_bt_device"
-        android:dialogTitle="@string/pref_select_bt_device"
+        android:key="pref_key_select_device_type"
+        android:title="@string/pref_select_device_type"
+        android:dialogTitle="@string/pref_select_device_type"
+        android:entries="@array/pref_select_device_type_entries"
+        android:entryValues="@array/pref_select_device_type_values"
         android:persistent="true"
-        android:defaultValue="@string/pref_select_bt_device_default" />
+        android:defaultValue="@string/pref_select_device_type_default" />
+    <ListPreference
+        android:key="pref_key_select_device"
+        android:title="@string/pref_select_device"
+        android:dialogTitle="@string/pref_select_device"
+        android:persistent="true"
+        android:defaultValue="@string/pref_select_device_default" />
     <PreferenceScreen
         android:key="pref_key_start_service"
         android:title="@string/pref_start_service" >

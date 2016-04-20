@@ -109,14 +109,6 @@ public class BluetoothHelper implements SerialHelper {
 
     }
 
-    @Override
-    protected void finalize() throws Throwable {
-        super.finalize();
-
-        // just in case bluetooth wasn't uninitialized in service/app onDestroy method
-        disconnect();
-    }
-
     /**
      * This unitializes the bluetooth manager.  It should always be called before a context is
      * destroyed in the onDestroy method.
@@ -200,14 +192,27 @@ public class BluetoothHelper implements SerialHelper {
         return deviceConnected;
     }
 
-    public boolean writeData(String data) {
+    public boolean writeString(String data) {
 
         if (mSocket == null) return false;
 
-        byte[] bytes = data.getBytes();
 
         try {
-            serialOut.write(bytes);
+            serialOut.write(data.getBytes());
+        } catch(IOException e) {
+            Log.e(TAG, "Error writing to device", e);
+            // Error sending the start command to the arduino
+            return false;
+        }
+        return true;
+    }
+
+    public boolean writeBytes(byte[] data) {
+
+        if (mSocket == null) return false;
+
+        try {
+            serialOut.write(data);
         } catch(IOException e) {
             Log.e(TAG, "Error writing to device", e);
             // Error sending the start command to the arduino

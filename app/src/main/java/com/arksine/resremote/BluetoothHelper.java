@@ -19,19 +19,22 @@ import java.util.Set;
 import java.util.UUID;
 
 
-
 /**
- * Class BluetoothManager - Handles basic bluetooth tasks needed for this app.
+ * Class BluetoothHelper - Handles basic bluetooth tasks needed for this app.
  */
-public class BluetoothManager {
+public class BluetoothHelper implements SerialHelper {
 
-    private static String TAG = "BluetoothManager";
+    private static String TAG = "BluetoothHelper";
 
     private Context mContext = null;
     private Activity mActivity = null;
 
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothSocket mSocket;
+
+    private boolean deviceConnected = false;
+    private InputStream serialIn;
+    private OutputStream serialOut;
 
     private final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
@@ -47,20 +50,24 @@ public class BluetoothManager {
 
                     if (state == BluetoothAdapter.STATE_TURNING_ON) {
                         Toast.makeText(mContext, "Bluetooth Turning On", Toast.LENGTH_SHORT).show();
+                    } else if (state == BluetoothAdapter.STATE_ON) {
+
+                        // TODO: Broadcast an intent back to the main activity telling it to repopulate the device list
                     }
 
                 }
             }
+
         }
     };
 
-    public BluetoothManager(Context context){
+    public BluetoothHelper(Context context){
         mContext = context;
-
+        deviceConnected = false;
         initBluetooth();
     }
 
-    public BluetoothManager(Activity activity) {
+    public BluetoothHelper(Activity activity) {
         mActivity = activity;
         mContext = mActivity.getApplicationContext();
 
@@ -98,7 +105,6 @@ public class BluetoothManager {
                 mActivity.startActivityForResult(enableBtIntent, R.integer.REQUEST_ENABLE_BT);
             }
 
-            return;
         }
 
     }
@@ -108,14 +114,14 @@ public class BluetoothManager {
         super.finalize();
 
         // just in case bluetooth wasn't uninitialized in service/app onDestroy method
-        uninitBluetooth();
+        disconnect();
     }
 
     /**
      * This unitializes the bluetooth manager.  It should always be called before a context is
      * destroyed in the onDestroy method.
      */
-    public void uninitBluetooth() {
+    public void disconnect() {
 
         if (isBtRecrRegistered) {
             isBtRecrRegistered = false;
@@ -158,57 +164,23 @@ public class BluetoothManager {
         return mAdapterList;
     }
 
+
+
     /**
      * Retrieves a bluetooth socket from a specified device.  WARNING: This function is blocking, do
      * not call from the UI thread!
      * @param macAddr - The mac address of the device to connect
-     * @return
      */
-    public boolean requestBluetoothSocket (String macAddr) {
+    public void connectDevice (String macAddr,  SerialHelper.DeviceReadyListener readyListener) {
 
         if (!isBluetoothOn()) {
-
-            return false;
+            readyListener.OnDeviceReady(false);
+            return;
         }
 
-        BluetoothDevice mDevice = mBluetoothAdapter.getRemoteDevice(macAddr);
-        if (mDevice == null) {
-            // device does not exist
-            Log.e(TAG, "Unable to open bluetooth device at " + macAddr);
-            return false;
-        }
+        ConnectionThread btConnectThread = new ConnectionThread(macAddr, readyListener);
+        btConnectThread.start();
 
-        // Attempt to create an insecure socket.  In the future I should probably
-        // add an option for a secure connection, as this is subject to a man
-        // in the middle attack.
-        try {
-            mSocket = mDevice.createInsecureRfcommSocketToServiceRecord(MY_UUID);
-        }
-        catch (IOException e) {
-            Log.e (TAG, "Unable to retrieve bluetooth socket for device " + macAddr);
-            mSocket = null;
-            return false;
-        }
-
-        mBluetoothAdapter.cancelDiscovery();
-
-        try {
-            // Connect the device through the socket. This will block
-            // until it succeeds or throws an exception
-            mSocket.connect();
-        } catch (IOException connectException) {
-
-            Log.e (TAG, "Unable to connect to bluetooth socket for device " + macAddr);
-            // Unable to connect; close the socket and get out
-            try {
-                mSocket.close();
-            } catch (IOException closeException) { }
-
-            mSocket = null;
-            return false;
-        }
-
-        return true;
     }
 
     public void closeBluetoothSocket() {
@@ -218,54 +190,139 @@ public class BluetoothManager {
                 mSocket.close();
             }
             catch (IOException e) {
+                Log.e(TAG, "Unable to close Socket", e);
             }
         }
     }
-
-    public InputStream getInputStream() {
-
-        InputStream iStream = null;
-        if (mSocket != null) {
-            try {
-                iStream = mSocket.getInputStream();
-            } catch (IOException e) {
-                iStream = null;
-            }
-        }
-        else {
-            iStream = null;
-        }
-
-        return iStream;
-    }
-
-    public OutputStream getOutputStream() {
-
-        OutputStream oStream;
-        if (mSocket != null) {
-            try {
-                oStream = mSocket.getOutputStream();
-            } catch (IOException e) {
-                oStream = null;
-            }
-        }
-        else {
-            oStream = null;
-        }
-
-        return oStream;
-    }
-
 
     public boolean isDeviceConnected() {
 
-        if (mSocket != null) {
-            return mSocket.isConnected();
-        }
-        else {
-            return false;
-        }
+        return deviceConnected;
     }
 
+    public boolean writeString(String data) {
 
+        if (mSocket == null) return false;
+
+
+        try {
+            serialOut.write(data.getBytes());
+        } catch(IOException e) {
+            Log.e(TAG, "Error writing to device", e);
+            // Error sending the start command to the arduino
+            return false;
+        }
+        return true;
+    }
+
+    public boolean writeBytes(byte[] data) {
+
+        if (mSocket == null) return false;
+
+        try {
+            serialOut.write(data);
+        } catch(IOException e) {
+            Log.e(TAG, "Error writing to device", e);
+            // Error sending the start command to the arduino
+            return false;
+        }
+        return true;
+    }
+
+    public byte readByte() {
+
+        if (mSocket == null) return 0;
+
+        byte input;
+        try {
+            input = (byte)serialIn.read();
+        }
+        catch (IOException e){
+            Log.i(TAG, "Error reading from device", e);
+            input = 0;
+        }
+
+        return input;
+    }
+
+    /**
+     * Thread for connecting a device and creating its input and output streams.
+     */
+    private class ConnectionThread extends Thread{
+
+        private String macAddr;
+        private SerialHelper.DeviceReadyListener readyListener;
+
+        public ConnectionThread(String macAddr, SerialHelper.DeviceReadyListener readyListener) {
+            this.macAddr = macAddr;
+            this.readyListener = readyListener;
+        }
+
+        @Override
+        public void run() {
+
+            BluetoothDevice mDevice = mBluetoothAdapter.getRemoteDevice(macAddr);
+            if (mDevice == null) {
+                // device does not exist
+                Log.e(TAG, "Unable to open bluetooth device at " + macAddr);
+                deviceConnected = false;
+                readyListener.OnDeviceReady(false);
+                return;
+            }
+
+            // Attempt to create an insecure socket.  In the future I should probably
+            // add an option for a secure connection, as this is subject to a man
+            // in the middle attack.
+            try {
+                mSocket = mDevice.createInsecureRfcommSocketToServiceRecord(MY_UUID);
+            }
+            catch (IOException e) {
+                Log.e (TAG, "Unable to retrieve bluetooth socket for device " + macAddr);
+                mSocket = null;
+                deviceConnected = false;
+                readyListener.OnDeviceReady(false);
+                return;
+            }
+
+            mBluetoothAdapter.cancelDiscovery();
+
+            try {
+                // Connect the device through the socket. This will block
+                // until it succeeds or throws an exception
+                mSocket.connect();
+            } catch (IOException connectException) {
+
+                Log.e (TAG, "Unable to connect to bluetooth socket for device " + macAddr);
+                // Unable to connect; close the socket and get out
+                try {
+                    mSocket.close();
+                } catch (IOException closeException) {
+                    Log.e(TAG, "Error closing bluetooth socket", closeException);
+                }
+
+                mSocket = null;
+                deviceConnected = false;
+                readyListener.OnDeviceReady(false);
+                return;
+            }
+
+            // Get input stream
+            try {
+                serialIn = mSocket.getInputStream();
+            } catch (IOException e) {
+                serialIn = null;
+            }
+
+            // Get output stream
+            try {
+                serialOut = mSocket.getOutputStream();
+            } catch (IOException e) {
+                serialOut = null;
+            }
+
+            deviceConnected = serialOut != null && serialIn != null;
+
+            readyListener.OnDeviceReady(deviceConnected);
+        }
+    }
 }

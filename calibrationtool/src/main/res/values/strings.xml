@@ -1,6 +1,8 @@
 <resources>
     <string name="app_name">CalibrationTool</string>
 
+    <string name="ACTION_STOP_SERVICE">com.arksine.resremote.ACTION_STOP_SERVICE</string>
+
     <string name="pref_select_device_type">Select Device Type</string>
     <string-array name="pref_select_device_type_entries">
         <item>Bluetooth uInput</item>
@@ -28,7 +30,8 @@
 
     <!-- Showcaseview strings-->
     <string name="cal_title">Touch Screen Calibration</string>
-    <string name="cal_text">Please touch the indicated point</string>
+    <string name="cal_connect">Connecting to device</string>
+    <string name="cal_point_text">Please touch the indicated point</string>
     <string name="cal_pressure_title">Pressure Calibration</string>
     <string name="cal_pressure_text">Touch the screen, slowly increasing pressure</string>
     <string name="cal_finshed_title">Calibration Complete!</string>

@@ -16,11 +16,9 @@ import android.view.View;
  */
 public class CalibrationView extends View {
 
-	private ShapeDrawable point1;
-	private ShapeDrawable point2;
-	private ShapeDrawable point3;
-	private  Paint mPaint;
-	private boolean drawablesSet = false;
+	private ShapeDrawable pointDrawable;
+	private Paint mPaint;
+	private boolean drawableVisible = false;
 
 	public CalibrationView(Context context, AttributeSet attrs) {
 		super(context, attrs);
@@ -34,9 +32,7 @@ public class CalibrationView extends View {
 
 	}
 
-	public void setDrawables(Point P1, Point P2, Point P3, int shapeSize) {
-
-		// TODO: Draw paths one at a time, depending on the point
+	public void showPoint(Point point, int shapeSize) {
 
 		int shapeHalf = shapeSize / 2;
 		Path cross =  new Path();
@@ -47,32 +43,24 @@ public class CalibrationView extends View {
 		cross.lineTo(shapeHalf, shapeSize);
 		cross.close();
 
-		point1 = new ShapeDrawable(new PathShape(cross, shapeSize, shapeSize));
-		point1.setBounds(P1.x - shapeHalf, P1.y - shapeHalf, P1.x + shapeHalf,
-				P1.y + shapeHalf);
-		point1.getPaint().set(this.mPaint);
+		pointDrawable = new ShapeDrawable(new PathShape(cross, shapeSize, shapeSize));
+		pointDrawable.getPaint().set(this.mPaint);
+		pointDrawable.setBounds(point.x - shapeHalf, point.y - shapeHalf, point.x + shapeHalf,
+				point.y + shapeHalf);
 
-		point2 = new ShapeDrawable(new PathShape(cross, shapeSize, shapeSize));
-		point2.setBounds(P2.x - shapeHalf, P2.y - shapeHalf, P2.x + shapeHalf,
-				P2.y + shapeHalf);
-		point2.getPaint().set(this.mPaint);
 
-		point3 = new ShapeDrawable(new PathShape(cross, shapeSize, shapeSize));
-		point3.setBounds(P3.x - shapeHalf, P3.y - shapeHalf, P3.x + shapeHalf,
-				P3.y + shapeHalf);
-		point3.getPaint().set(this.mPaint);
+		drawableVisible = true;
 
-		drawablesSet = true;
+	}
 
+	public void hidePoint() {
+		drawableVisible = false;
 	}
 
 	@Override
 	protected void onDraw(Canvas canvas) {
-		if (drawablesSet) {
-
-			point1.draw(canvas);
-			point2.draw(canvas);
-			point3.draw(canvas);
+		if (drawableVisible) {
+			pointDrawable.draw(canvas);
 		}
 	}
 }

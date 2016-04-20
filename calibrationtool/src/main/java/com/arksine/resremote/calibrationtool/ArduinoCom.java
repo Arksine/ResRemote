@@ -115,10 +115,18 @@ public class ArduinoCom extends Thread{
         byte ch;
 
         // get the first byte, anything other than a '<' is trash and will be ignored
-        while((ch = mSerialHelper.readByte()) != '<' && mRunning);
+        while(mRunning && (mSerialHelper.readByte() != '<')) {
+            // sleep for a 50ms before polling again
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Log.i(TAG, "Sleep interrupted", e);
+            }
+
+        }
 
         // First byte is good, capture the rest until we get to the end of the message
-        while ((ch = mSerialHelper.readByte()) != '>' && mRunning) {
+        while (mRunning && ((ch = mSerialHelper.readByte()) != '>')) {
             buffer[bytes] = ch;
             bytes++;
         }
@@ -158,7 +166,7 @@ public class ArduinoCom extends Thread{
         for (int i = 0; i < 3; i++) {
 
             // Tell the Arudino to recieve a single point
-            mSerialHelper.writeData("<CAL_POINT>");
+            mSerialHelper.writeString("<CAL_POINT>");
 
             screenPt = readMessage();
             if (screenPt == null){
@@ -177,7 +185,9 @@ public class ArduinoCom extends Thread{
             // Sleep for one second so the UI has time to animate to the next point
             try {
                 Thread.sleep(1000);
-            } catch (InterruptedException e) { }
+            } catch (InterruptedException e) {
+                Log.i(TAG, "Sleep interrupted", e);
+            }
 
         }
 
@@ -197,7 +207,9 @@ public class ArduinoCom extends Thread{
         try {
             readResistanceThread.join(10000);
         }
-        catch (InterruptedException e) {}
+        catch (InterruptedException e) {
+            Log.i(TAG, "Resistance Thread interrupted", e);
+        }
 
         // kill the thread if its still alive
         if (readResistanceThread.isAlive())
@@ -237,7 +249,7 @@ public class ArduinoCom extends Thread{
 
             ArduinoMessage screenPt;
 
-            mSerialHelper.writeData("<CAL_PRESSURE>");
+            mSerialHelper.writeString("<CAL_PRESSURE>");
             while (isRunning) {
 
                 screenPt = readMessage();
@@ -288,23 +300,34 @@ public class ArduinoCom extends Thread{
         Point D2;     // Bottom Center device coordinate
         Point D3;     // Top Left device coordinate
 
-        DisplayManager displayManager = (DisplayManager)mContext.getSystemService(Context.DISPLAY_SERVICE);
-        Display myDisplay = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
+        String deviceType = PreferenceManager.getDefaultSharedPreferences(mContext)
+                .getString("pref_key_select_device_type", "BT_UINPUT");
 
-        Point maxSize = new Point();
-        myDisplay.getRealSize(maxSize);
+        if (deviceType.equals("BT_UINPUT")) {
+            DisplayManager displayManager = (DisplayManager) mContext.getSystemService(Context.DISPLAY_SERVICE);
+            Display myDisplay = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
 
-        // Get 10% of each axis, as our touch points will be within those ranges
-        int xOffset = Math.round(0.1f * maxSize.x);
-        int yOffset = Math.round(0.1f * maxSize.y);
+            Point maxSize = new Point();
+            myDisplay.getRealSize(maxSize);
 
+            // Get 10% of each axis, as our touch points will be within those ranges
+            int xOffset = Math.round(0.1f * maxSize.x);
+            int yOffset = Math.round(0.1f * maxSize.y);
 
-        // Points are zero indexed, so we always subtract 1 pixel
-        D1 = new Point(((maxSize.x - xOffset) - 1),
-                ((maxSize.y / 2) - 1));
-        D2 = new Point(((maxSize.x / 2) - 1),
-                ((maxSize.y - yOffset) - 1));
-        D3 = new Point((xOffset - 1), (yOffset - 1));
+            // Points are zero indexed, so we always subtract 1 pixel
+            D1 = new Point(((maxSize.x - xOffset) - 1),
+                    ((maxSize.y / 2) - 1));
+            D2 = new Point(((maxSize.x / 2) - 1),
+                    ((maxSize.y - yOffset) - 1));
+            D3 = new Point((xOffset - 1), (yOffset - 1));
+        } else {
+            // HID devices use percentages rather than pixels, with a range from 0 to 10000.  Since
+            // each point is 10% of the screen, the offset is 1000
+
+            D1 = new Point(9000, 5000);
+            D2 = new Point(5000, 9000);
+            D3 = new Point(1000, 1000);
+        }
 
         Log.i(TAG, "Device Point 1: x:" + D1.x + " y:" +D1.y);
         Log.i(TAG, "Device Point 2: x:" + D2.x + " y:" +D2.y);
@@ -337,24 +360,40 @@ public class ArduinoCom extends Thread{
         Log.i(TAG, "E coefficient: " + E);
         Log.i(TAG, "F coefficient: " + F);
 
+
         // Now calculate the pressure coefficient
         int resDifference = resistance.y - resistance.x;
-        float pressureCoef = 255 / resDifference;  // (pressure is 255 - (resistance - resMin)*pressureCoef)
+        float pressureCoef = 255.0f / resDifference;  // (pressure is 255 - (resistance - resMin)*pressureCoef)
+
+        Log.i(TAG, "Resistance coefficient:" + pressureCoef);
 
         int tmp;  // all floats will be sent as integers, with 3 decimal places of precision
 
-        // Send coefficients to the arduino
-        //TODO: send the floats to the arduino in binary rather than as strings.  Use the parse float function
-        //      it will require that I change the writedata function to accept bytes rather than strings
-        if (!sendCalibrationVariable("<$A:" + Float.toString(A) + ">")) return false;
-        if (!sendCalibrationVariable("<$B:" + Float.toString(B) + ">")) return false;
-        if (!sendCalibrationVariable("<$C:" + Float.toString(C) + ">")) return false;
-        if (!sendCalibrationVariable("<$D:" + Float.toString(D) + ">")) return false;
-        if (!sendCalibrationVariable("<$E:" + Float.toString(E) + ">")) return false;
-        if (!sendCalibrationVariable("<$F:" + Float.toString(F) + ">")) return false;
-        if (!sendCalibrationVariable("<$R:" + Float.toString(pressureCoef) + ">")) return false;
+        // Send coefficients to the arduino.  They will be sent as integers with 4 decimals of precision.
+        tmp = Math.round(A * 10000);
+        if (!sendCalibrationVariable("<$A:" + Integer.toString(tmp) + ">")) return false;
+
+        tmp = Math.round(B * 10000);
+        if (!sendCalibrationVariable("<$B:" + Integer.toString(tmp) + ">")) return false;
+
+        tmp = Math.round(C * 10000);
+        if (!sendCalibrationVariable("<$C:" + Integer.toString(tmp) + ">")) return false;
+
+        tmp = Math.round(D * 10000);
+        if (!sendCalibrationVariable("<$D:" + Integer.toString(tmp) + ">")) return false;
+
+        tmp = Math.round(E * 10000);
+        if (!sendCalibrationVariable("<$E:" + Integer.toString(tmp) + ">")) return false;
+
+        tmp = Math.round(F * 10000);
+        if (!sendCalibrationVariable("<$F:" + Integer.toString(tmp) + ">")) return false;
+
+        tmp = Math.round(pressureCoef * 10000);
+        if (!sendCalibrationVariable("<$R:" + Integer.toString(tmp) + ">")) return false;
+
         if (!sendCalibrationVariable("<$M:" + Integer.toString(resistance.x) +">")) return false;
-        mSerialHelper.writeData("<WRITE_CALIBRATION>");
+
+        mSerialHelper.writeString("<WRITE_CALIBRATION>");
 
         return true;
     }
@@ -362,11 +401,11 @@ public class ArduinoCom extends Thread{
     private boolean sendCalibrationVariable(String varData) {
 
         ArduinoMessage receipt;
-        mSerialHelper.writeData(varData);
+        mSerialHelper.writeString(varData);
         receipt = readMessage();
         if (!receipt.desc.equals("OK")) {
             Log.e(TAG, receipt.command + " " + receipt.desc);
-            mSerialHelper.writeData("<ERROR>");
+            mSerialHelper.writeString("<ERROR>");
             return false;
         } else {
             ArduinoMessage value = readMessage();

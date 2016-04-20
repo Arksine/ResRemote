@@ -14,16 +14,26 @@
     <string name="ACTION_CAL_ACTIVITY_STARTED">com.arksine.resremote.ACTION_CAL_ACTIVITY_STARTED</string>
 
     <!-- Strings related to Settings -->
+    <string name="pref_select_device_type">Select Device Type</string>
+    <string-array name="pref_select_device_type_entries">
+        <item>Bluetooth</item>
+        <item>Usb</item>
+    </string-array>
+    <string-array name="pref_select_device_type_values">
+        <item>BLUETOOTH</item>
+        <item>USB</item>
+    </string-array>
+    <string name="pref_select_device_type_default">BLUETOOTH</string>
 
-    <string name="pref_select_bt_device">Select Bluetooth Device</string>
-    <string-array name="pref_select_bt_device_entries">
+    <string name="pref_select_device">Select Device</string>
+    <string-array name="pref_select_device_entries">
         <item>No Device Selected</item>
     </string-array>
-    <string-array name="pref_select_bt_device_values">
+    <string-array name="pref_select_device_values">
         <item>NO_DEVICE</item>
     </string-array>
-    <string name="pref_select_bt_device_summary">No Device Selected</string>
-    <string name="pref_select_bt_device_default">NO_DEVICE</string>
+    <string name="pref_select_device_summary">No Device Selected</string>
+    <string name="pref_select_device_default">NO_DEVICE</string>
 
     <string name="pref_start_service">Start Service</string>
     <string name="pref_stop_service">Stop Service</string>

@@ -10,10 +10,10 @@
 #define CONFIG_VERSION "rt1"
 #define MEMORYBASE 32 // where to store and retrieve EEPROM memory
 
-#define YP A1  // must be an analog pin, use "An" notation!
-#define XM A2  // must be an analog pin, use "An" notation!
-#define YM 8   // can be a digital pin
-#define XP 9   // can be a digital pin
+#define YP A0   // must be an analog pin, use "An" notation!
+#define XM A1   // must be an analog pin, use "An" notation!
+#define YM A2   // can be a digital pin
+#define XP A3   // can be a digital pin
 
 #define MINPRESSURE 10
 #define MAXPRESSURE 1000

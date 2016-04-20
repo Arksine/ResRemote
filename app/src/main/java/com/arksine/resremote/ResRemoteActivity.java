@@ -4,6 +4,7 @@ import android.app.Activity;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
@@ -14,27 +15,20 @@ import android.widget.Toast;
 
 import java.util.ArrayList;
 
-
-// TODO: I could add USB support as well.
 public class ResRemoteActivity extends Activity {
 
     private static String TAG = "ResRemoteActivity";
 
     private boolean bluetoothEnabled = false;
-    private static BluetoothManager btManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        btManager = new BluetoothManager(this);
 
-        if (btManager.isBluetoothOn() || bluetoothEnabled) {
-
-            getFragmentManager().beginTransaction()
-                    .add(android.R.id.content, new SettingsFragment())
-                    .commit();
-        }
+        getFragmentManager().beginTransaction()
+                .add(android.R.id.content, new SettingsFragment())
+                .commit();
 
     }
 
@@ -58,6 +52,9 @@ public class ResRemoteActivity extends Activity {
 
     public static class SettingsFragment extends PreferenceFragment {
 
+        SerialHelper mSerialHelper;
+        private String mDeviceType;
+
         @Override
         public void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
@@ -69,15 +66,30 @@ public class ResRemoteActivity extends Activity {
             PreferenceScreen calibrate = (PreferenceScreen) root.findPreference("pref_key_calibrate") ;
             PreferenceScreen startService = (PreferenceScreen) root.findPreference("pref_key_start_service");
             PreferenceScreen stopService = (PreferenceScreen) root.findPreference("pref_key_stop_service");
-            ListPreference selectDevice = (ListPreference) root.findPreference("pref_key_select_bt_device");
+            ListPreference selectDeviceType = (ListPreference) root.findPreference("pref_key_select_device_type");
+            ListPreference selectDevice = (ListPreference) root.findPreference("pref_key_select_device");
             ListPreference selectOrientation = (ListPreference) root.findPreference("pref_key_select_orientation");
 
-            ArrayList<String> mAdapterList = btManager.enumerateDevices();
-            populateDeviceListView(mAdapterList, selectDevice);
+            mDeviceType = selectDeviceType.getValue();
+            populateDeviceListView();
 
-            selectDevice.setSummary(selectDevice.getEntry());
+            selectDeviceType.setSummary(selectDeviceType.getEntry());
             selectOrientation.setSummary(selectOrientation.getEntry());
 
+            selectDeviceType.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(Preference preference, Object newValue) {
+                    ListPreference list = (ListPreference)preference;
+                    CharSequence[] entries = list.getEntries();
+                    int index = list.findIndexOfValue((String)newValue);
+                    preference.setSummary(entries[index]);
+
+                    mDeviceType = (String)newValue;
+                    populateDeviceListView();
+
+                    return true;
+                }
+            });
             selectDevice.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
                 @Override
                 public boolean onPreferenceChange(Preference preference, Object newValue) {
@@ -126,14 +138,39 @@ public class ResRemoteActivity extends Activity {
                 @Override
                 public boolean onPreferenceClick(Preference preference) {
 
-                    //TODO: Launch calibration application
+                    PackageManager packageManager = getActivity().getPackageManager();
+                    Intent launchIntent = packageManager
+                            .getLaunchIntentForPackage("com.arksine.resremote.calibrationtool");
+                    if (launchIntent != null) {
+                        // App exists, start it.
+                        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(launchIntent);
+                    } else {
+                        Toast.makeText(getActivity(), "Calibration tool not installed", Toast.LENGTH_SHORT).show();
+                    }
+
                     return true;
                 }
             });
         }
 
-        private void populateDeviceListView(ArrayList<String> mAdapterList,
-                                            ListPreference selectDevice) {
+        private void populateDeviceListView() {
+
+            PreferenceScreen root = this.getPreferenceScreen();
+            ListPreference selectDevicePref =
+                    (ListPreference) root.findPreference("pref_key_select_device");
+
+            if (mDeviceType.equals("BLUETOOTH")) {
+                // user selected bluetooth device
+                mSerialHelper = new BluetoothHelper(getActivity());
+            }
+            else {
+                // user selected usb device
+                mSerialHelper = new UsbHelper(getActivity());
+
+            }
+
+            ArrayList<String> mAdapterList = mSerialHelper.enumerateDevices();
 
             CharSequence[] entries;
             CharSequence[] entryValues;
@@ -146,7 +183,7 @@ public class ResRemoteActivity extends Activity {
                 entries[0]  = "No devices found";
                 entryValues[0] = "NO_DEVICE";
 
-                selectDevice.setSummary(entries[0]);
+                selectDevicePref.setSummary(entries[0]);
             }
             else {
 
@@ -163,9 +200,19 @@ public class ResRemoteActivity extends Activity {
                 }
             }
 
-            selectDevice.setEntries(entries);
-            selectDevice.setEntryValues(entryValues);
+            selectDevicePref.setEntries(entries);
+            selectDevicePref.setEntryValues(entryValues);
+
+            // if the currently stored value isn't in the new list, reset the summary
+            int index = selectDevicePref.findIndexOfValue(selectDevicePref.getValue());
+            if (index == -1) {
+                selectDevicePref.setSummary("");
+            }
+            else {
+                selectDevicePref.setSummary(selectDevicePref.getEntry());
+            }
         }
+
     }
 
 }

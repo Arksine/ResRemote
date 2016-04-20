@@ -81,8 +81,6 @@ public class CalibrateTouchActivity extends AppCompatActivity {
         }
     };
 
-    // TODO: Draw Points points on the view as the showcase moves rather than draw them all
-    //       initially
     /**
      *  Start Runnables for UI updates (they are executed in another thread)
      */
@@ -91,11 +89,11 @@ public class CalibrateTouchActivity extends AppCompatActivity {
         public void run() {
             mDevicePoints = new Point[NUMPOINTS];
             getDevicePoints();
-            mCalView.setDrawables(mDevicePoints[0], mDevicePoints[1], mDevicePoints[2],
-                    mShapeSize);
+            mCalView.showPoint(mDevicePoints[0], mShapeSize);
             mCalView.invalidate();
             PointTarget target = new PointTarget(mDevicePoints[0]);
             //showcase.setShouldCentreText(true);
+            mShowcase.setContentText(getString(R.string.cal_point_text));
             mShowcase.setShowcase(target, true);
         }
     };
@@ -103,6 +101,8 @@ public class CalibrateTouchActivity extends AppCompatActivity {
     private final Runnable uiMovePointRunnable = new Runnable() {
         @Override
         public void run() {
+            mCalView.showPoint(mDevicePoints[mPointIndex], mShapeSize);
+            mCalView.invalidate();
             PointTarget target = new PointTarget(mDevicePoints[mPointIndex]);
             mShowcase.setShowcase(target, true);
         }
@@ -111,6 +111,8 @@ public class CalibrateTouchActivity extends AppCompatActivity {
     private final Runnable uiPressureRunnable = new Runnable() {
         @Override
         public void run() {
+            mCalView.showPoint(mCenterPoint, mShapeSize);
+            mCalView.invalidate();
             PointTarget target = new PointTarget(mCenterPoint);
             mShowcase.setShowcase(target, true);
             mShowcase.setContentTitle(getString(R.string.cal_pressure_title));
@@ -121,6 +123,8 @@ public class CalibrateTouchActivity extends AppCompatActivity {
     private final Runnable uiFinishedRunnable = new Runnable() {
         @Override
         public void run() {
+            mCalView.hidePoint();
+            mCalView.invalidate();
             mShowcase.setTarget(Target.NONE);
             mShowcase.setContentTitle(getString(R.string.cal_finshed_title));
             mShowcase.setContentText(getString(R.string.cal_finished_text));
@@ -150,12 +154,21 @@ public class CalibrateTouchActivity extends AppCompatActivity {
                     mArduino.start();
                 }
                 else {
-                    // unable to connect to device
-                    Toast.makeText(getApplicationContext(), "Error connecting to device, exiting",
-                            Toast.LENGTH_SHORT).show();
+                    Runnable toast = new Runnable() {
+                        @Override
+                        public void run() {
+                            // unable to connect to device
+                            Toast.makeText(getApplicationContext(), "Error connecting to device, exiting",
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    };
+                    runOnUiThread(toast);
+                    mArduino.disconnect();
                     mEventHandler.postDelayed(exitActivityRunnable, 3000);
                 }
+
             }
+
 
             @Override
             public void onPointReceived(int pointIndex) {
@@ -176,9 +189,16 @@ public class CalibrateTouchActivity extends AppCompatActivity {
                 if (success) {
                     runOnUiThread(uiFinishedRunnable);
                 } else {
-                    // unable to connect to device
-                    Toast.makeText(getApplicationContext(), "Error receiving pressure, exiting",
-                            Toast.LENGTH_SHORT).show();
+                    Runnable toast = new Runnable() {
+                        @Override
+                        public void run() {
+                            // unable to connect to device
+                            Toast.makeText(getApplicationContext(), "Error receiving pressure, exiting",
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    };
+                    runOnUiThread(toast);
+
                     mArduino.disconnect();
                     mEventHandler.postDelayed(exitActivityRunnable, 3000);
                 }
@@ -188,7 +208,6 @@ public class CalibrateTouchActivity extends AppCompatActivity {
             public void onFinished(boolean success) {
                 if (!success) {
                     // error writing calibration values to arduino
-                    // TODO: Need to create a runnable for this and run on UI thread
                     Runnable toast = new Runnable() {
                         @Override
                         public void run() {
@@ -232,7 +251,7 @@ public class CalibrateTouchActivity extends AppCompatActivity {
                 .setShowcaseDrawer(new CalShowcaseDrawer(mShapeSize / 2))
                 .setStyle(R.style.CalibrationShowcaseStyle)
                 .setContentTitle(R.string.cal_title)
-                .setContentText(R.string.cal_text)
+                .setContentText(R.string.cal_connect)
                 .blockAllTouches()
                 .setOnClickListener(btnListener)
                 .build();

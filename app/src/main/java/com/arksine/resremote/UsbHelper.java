@@ -1,4 +1,4 @@
-package com.arksine.resremote.calibrationtool;
+package com.arksine.resremote;
 
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;

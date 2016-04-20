@@ -13,23 +13,18 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Process;
 import android.preference.PreferenceManager;
-import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.view.Display;
 import android.view.OrientationEventListener;
 import android.view.Surface;
 import android.widget.Toast;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 
 /**
  * Class ArduinoCom
  *
  * This class handles bluetooth serial communication with the arduino.  First, it establishes
- * a bluetooth connection and confirms that the Arudino is connected.  It will then launch an
- * activity to calibrate the touchscreen if necessary.  After setup is complete, it will listen
+ * a serial connection and confirms that the Arudino is connected.    After setup is complete, it will listen
  * for resistive touch screen events from the arudino and send them to the NativeInput class
  * where they can be handled by the uinput driver in the NDK.
  */
@@ -38,14 +33,14 @@ public class ArduinoCom implements Runnable{
     private static final String TAG = "ArduinoCom";
 
     private NativeInput uInput = null;
-    private boolean mConnected = false;
+    private volatile boolean mConnected = false;
+    private volatile boolean mConnectionFinished = false;
     private Context mContext;
 
     private volatile boolean mRunning = false;
 
-    private BluetoothManager btManager;
-    private final InputStream arudinoInput;
-    private final OutputStream arduinoOutput;
+    private SerialHelper mSerialHelper;
+    private SerialHelper.DeviceReadyListener readyListener;
 
     private InputHandler mInputHandler;
     private Looper mInputLooper;
@@ -81,7 +76,7 @@ public class ArduinoCom implements Runnable{
             if (mContext.getString(R.string.ACTION_SEND_DATA).equals(action)) {
                 // stops all queued services
                 String data = intent.getStringExtra(mContext.getString(R.string.EXTRA_DATA));
-                writeData(data);
+                mSerialHelper.writeString(data);
             }
         }
     }
@@ -103,37 +98,43 @@ public class ArduinoCom implements Runnable{
 
         mContext = context;
 
-        btManager = new BluetoothManager(mContext);
         HandlerThread thread = new HandlerThread("ServiceStartArguments",
                 Process.THREAD_PRIORITY_BACKGROUND);
         thread.start();
         mInputLooper = thread.getLooper();
         mInputHandler = new InputHandler(mInputLooper);
+
         final SharedPreferences sharedPrefs =
                 PreferenceManager.getDefaultSharedPreferences(mContext);
 
-        mConnected = connect(sharedPrefs);
-        //TODO: we need to break here, as at times we are somehow dereferencing a null inputstream
-        //      (or we are reading/writing to one)
+        String deviceType = sharedPrefs.getString("pref_key_select_device_type", "BLUETOOTH");
+        if (deviceType.equals("BLUETOOTH")) {
+            // user selected bluetooth device
+            mSerialHelper = new BluetoothHelper(mContext);
+        }
+        else {
+            // user selected usb device
+            mSerialHelper = new UsbHelper(mContext);
 
-        InputStream tmpIn = btManager.getInputStream();
-        OutputStream tmpOut = btManager.getOutputStream();
-        arudinoInput = tmpIn;
-        arduinoOutput = tmpOut;
-
-        if (arudinoInput == null || arduinoOutput == null) {
-            mConnected = false;
-            return;
         }
 
-        // Determine if the screen is calibrated
-        String orientation = sharedPrefs.getString("pref_key_select_orientation", "Landscape");
+        readyListener = new SerialHelper.DeviceReadyListener() {
+            @Override
+            public void OnDeviceReady(boolean deviceReadyStatus) {
+                mConnected = deviceReadyStatus;
+                mConnectionFinished = true;
+            }
+        };
+
+        if (!connect(sharedPrefs)) {
+            return;
+        }
 
         if (!startUinput()) {
             mConnected = false;
             return;
         }
-
+        String orientation = sharedPrefs.getString("pref_key_select_orientation", "Landscape");
         // Set up the orientation listener
         orientationListener = new OrientationEventListener(mContext) {
             @Override
@@ -157,7 +158,7 @@ public class ArduinoCom implements Runnable{
         isWriteReceiverRegistered = true;
 
         // Tell the Arudino that it is time to start
-        if (!writeData("<START>")) {
+        if (!mSerialHelper.writeString("<START>")) {
             // unable to write start command
             Log.e(TAG, "Unable to start arduino");
             mConnected = false;
@@ -165,44 +166,20 @@ public class ArduinoCom implements Runnable{
 
     }
 
-    @Override
-    protected void finalize() throws Throwable {
-        super.finalize();
-
-        disconnect();
-    }
-
     private boolean connect(SharedPreferences sharedPrefs) {
 
-        final String macAddr = sharedPrefs.getString("pref_key_select_bt_device", "NO_DEVICE");
-        if (macAddr.equals("NO_DEVICE")){
+        final String devId = sharedPrefs.getString("pref_key_select_device", "NO_DEVICE");
+        if (devId.equals("NO_DEVICE")){
             return false;
         }
 
-        // Request a socket in another thread so we can timeout after one second
-        Runnable requestBtSocket = new Runnable() {
-            @Override
-            public void run() {
-                btManager.requestBluetoothSocket(macAddr);
-            }
-        };
-        Thread requestBtSocketThread = new Thread(requestBtSocket);
-        requestBtSocket.run();
+        mSerialHelper.connectDevice(devId, readyListener);
 
-        // Wait one second for the request to complete
-        try {
-            requestBtSocketThread.join(1000);
-        }
-        catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        if (requestBtSocketThread.isAlive()) {
-            // request timed out, close and return false
-            btManager.closeBluetoothSocket();
-            return false;
-        }
+        // wait until the connection is finished.  The readyListener is a callback that will
+        // set the variable below and set mConnected to the connection status
+        while(!mConnectionFinished);
 
-        return btManager.isDeviceConnected();
+        return mConnected;
 
     }
 
@@ -275,41 +252,26 @@ public class ArduinoCom implements Runnable{
         }
     }
 
-	/**
-     * Sends data to the arduino for processing
-     * @param data  Data to write to the arduino
-     * @return  true is successful, false otherwise
-     */
-    public boolean writeData(String data) {
-        byte[] bytes = data.getBytes();
-
-        try {
-            arduinoOutput.write(bytes);
-        } catch(IOException e) {
-            // Error sending the start command to the arduino
-            return false;
-        }
-        return true;
-    }
-
-
     // Reads a message from the arduino and parses it
     private ArduinoMessage readMessage() {
 
         int bytes = 0;
         byte[] buffer = new byte[256];
         byte ch;
-        try {
-            // get the first byte, anything other than a '<' is trash and will be ignored
-            while((ch = (byte)arudinoInput.read()) != '<');
 
-            // First byte is good, capture the rest until we get to the end of the message
-            while ((ch = (byte)arudinoInput.read()) != '>') {
-                buffer[bytes] = ch;
-                bytes++;
-            }
+        // get the first byte, anything other than a '<' is trash and will be ignored
+        while(mRunning && (mSerialHelper.readByte() != '<')) {
+            // sleep for 50ms between polling
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) { }
+        };
+
+        // First byte is good, capture the rest until we get to the end of the message
+        while (mRunning && ((ch = mSerialHelper.readByte()) != '>')) {
+            buffer[bytes] = ch;
+            bytes++;
         }
-        catch (IOException e){ return null;}
 
         ArduinoMessage ardMsg;
         String message = new String(buffer, 0, bytes);
@@ -332,8 +294,14 @@ public class ArduinoCom implements Runnable{
 
         }
         else {
-            Log.e(TAG, "Issue parsing string, invalid data recd");
+            if (mRunning) {
+                // Only log an error if the device has been shut down, it always throws an
+                // IOExeception when the socket is closed
+                Log.e(TAG, "Issue parsing string, invalid data recd");
+            }
+
             ardMsg = null;
+
         }
 
         return ardMsg;
@@ -341,11 +309,13 @@ public class ArduinoCom implements Runnable{
 
     public void disconnect () {
         mRunning = false;
-        writeData("<STOP>");
-        if (btManager!= null) {
-            btManager.uninitBluetooth();
+
+        if (mSerialHelper!= null) {
+            mSerialHelper.writeString("<STOP>");
+            mSerialHelper.disconnect();
             mConnected = false;
-            btManager = null;
+            mConnectionFinished = false;
+            mSerialHelper = null;
         }
 
         if (uInput != null) {

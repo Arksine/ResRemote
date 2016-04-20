@@ -15,7 +15,7 @@
         android:persistent="true"
         android:defaultValue="@string/pref_select_device_default" />
     <PreferenceScreen
-        android:key="pref_key_start_calbration"
+        android:key="pref_key_start_calibration"
         android:title="@string/pref_start_calibration" >
     </PreferenceScreen>
 </PreferenceScreen>

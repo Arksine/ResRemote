@@ -1,3 +1,4 @@
+
 /**
  * ResistiveTouchController
  * 
@@ -6,14 +7,17 @@
 
 #include <TouchScreen.h>
 #include <EEPROMex.h>
+#include <HID-Project.h>
+#include <HID-Settings.h>
+
 
 #define CONFIG_VERSION "rt1"
 #define MEMORYBASE 32 // where to store and retrieve EEPROM memory
 
-#define YP A1  // must be an analog pin, use "An" notation!
-#define XM A2  // must be an analog pin, use "An" notation!
-#define YM 8   // can be a digital pin
-#define XP 9   // can be a digital pin
+#define YP A0   // must be an analog pin, use "An" notation!
+#define XM A1   // must be an analog pin, use "An" notation!
+#define YM A2   // can be a digital pin
+#define XP A3   // can be a digital pin
 
 #define MINPRESSURE 10
 #define MAXPRESSURE 1000
@@ -25,9 +29,10 @@
 // TODO:  need to measure resistance of the x-plate on the camaro touch screen
 TouchScreen ts = TouchScreen(XP, YP, XM, YM, XPLATE);
 
-boolean start = false;
+boolean start;
 boolean isCalibrated = false;
 boolean isTouching = false;
+boolean serialStart = true;
 unsigned long readLoopTime = 0;  
 unsigned long touchTime = 0;
 int configAddress = 0;   
@@ -53,16 +58,31 @@ struct StoreStruct {
 } storage = {CONFIG_VERSION, 1, 1, 1, 1, 1, 1, 1, MAXPRESSURE, MINPRESSURE};
 
 
-
 void setup() {
-  Serial.begin(115200);
-  while (!Serial);
-  Serial.flush();
-
+  Serial.begin(9600);
+ 
   EEPROM.setMemPool(MEMORYBASE, EEPROMSizeATmega328);
   configAddress  = EEPROM.getAddress(sizeof(StoreStruct)); // Size of config object 
   isCalibrated = loadConfig();
-  
+
+  if (!isCalibrated) {
+    // set defaults for storage struct, output will be raw coordinates
+    strcpy(storage.version, "nnn"); // the version doesnt match, so don't assign CONFIG_VERSION
+    storage.A = 10000;
+    storage.B = 0;
+    storage.C = 0;
+    storage.D = 0;
+    storage.E = 10000;
+    storage.F = 0;
+    storage.R = 10000;
+    storage.pressureMax = MAXPRESSURE;
+    storage.resMin = MINPRESSURE;
+    
+  }
+
+  start = true;
+
+  Digitizer.begin();
 }
 
 void loop() {
@@ -71,7 +91,7 @@ void loop() {
   checkSerial();
 
   // main loop, app must tell us to start
-  if (start && ((millis() - readLoopTime) >= READLOOPDELAY)) {
+  if (start && (millis() - readLoopTime) >= READLOOPDELAY) {
     readLoopTime = millis();
     TSPoint p = ts.getPoint();
     
@@ -85,7 +105,7 @@ void loop() {
       // I might need to adjust the touch up delay, 50 - 100ms should work
      
         isTouching = false;
-        Serial.print("<UP:0:0:0>");
+        Digitizer.release();
     }
   }
 
@@ -110,14 +130,7 @@ void sendConvertedCoordinate(int tX, int tY, int tZ) {
     dY = ((storage.D * tX) + (storage.E * tY) + storage.F + 5000l) / 10000l;
     dZ = storage.pressureMax - ((((tZ - storage.resMin) * storage.R) + 5000l) / 10000l);
 
-    Serial.print("<DOWN:");
-    Serial.print(dX);
-    Serial.print(":");
-    Serial.print(dY);
-    Serial.print(":");
-    Serial.print(dZ);
-    Serial.print(">");
-  
+    Digitizer.moveTo(dX, dY);
 }
 
 /**
@@ -125,6 +138,21 @@ void sendConvertedCoordinate(int tX, int tY, int tZ) {
  *
  */
 void checkSerial() {
+
+  if (!Serial) {
+    // exit if there is no serial connection
+    return;
+    
+  } else if (serialStart) {
+    // flush serial if the serial connection was just opened
+    Serial.flush();
+
+    if (!isCalibrated) {
+      // TODO: Log that the device is not calibrated?
+      // Serial.write("<LOG:Device not calibrated>");
+    }
+    serialStart =  false;
+  }
   
   if (Serial.available() > 0)
   {
@@ -155,27 +183,6 @@ void checkPacket() {
     // no command received
     return;
   }
-  else if (serialBuffer == "START") {
-    // start main loop
-    if (!isCalibrated) {
-      // set defaults for storage struct, output will be raw coordinates
-      strcpy(storage.version, "nnn"); // the version doesnt match, so don't assign CONFIG_VERSION
-      storage.A = 10000;
-      storage.B = 0;
-      storage.C = 0;
-      storage.D = 0;
-      storage.E = 10000;
-      storage.F = 0;
-      storage.R = 10000;
-      storage.pressureMax = MAXPRESSURE;
-      storage.resMin = MINPRESSURE;
-      Serial.write("<LOG:Device not calibrated>");
-    }
-    start = true;
-  }
-  else if (serialBuffer == "STOP") {
-    start = false;
-  }
   else if (serialBuffer == "CAL_POINT") {
     // Get a single point from the touch screen and send it
     start = false;
@@ -199,6 +206,7 @@ void checkPacket() {
     strcpy(storage.version, CONFIG_VERSION);
     storage.pressureMax = DEVICEMAXPRESSURE; // TODO: Get this from device
     EEPROM.writeBlock(configAddress, storage);
+    start = true;  // go ahead and restart the loop
   }  
   else if (serialBuffer == "ERROR") {
     // TODO: should probably handle this error somehow
