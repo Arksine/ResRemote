@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
+import android.preference.PreferenceManager;
 import android.preference.PreferenceScreen;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -40,10 +41,12 @@ public class MainActivity extends AppCompatActivity {
             PreferenceScreen root = this.getPreferenceScreen();
             ListPreference selectDeviceTypePref =
                     (ListPreference) root.findPreference("pref_key_select_device_type");
-            final ListPreference selectDevicePref =
+            ListPreference selectDevicePref =
                     (ListPreference) root.findPreference("pref_key_select_device");
             PreferenceScreen startCalibrationPref  =
-                    (PreferenceScreen) root.findPreference("pref_key_start_calibration") ;
+                    (PreferenceScreen) root.findPreference("pref_key_start_calibration");
+            PreferenceScreen setOrientationPref =
+                    (PreferenceScreen) root.findPreference("pref_key_set_controller_orientation");
 
             mDeviceType = selectDeviceTypePref.getValue();
             populateDeviceListView();
@@ -91,6 +94,43 @@ public class MainActivity extends AppCompatActivity {
 
                     Intent startCal = new Intent(getActivity(), CalibrateTouchActivity.class);
                     startActivity(startCal);
+                    return true;
+                }
+            });
+
+            setOrientationPref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+
+                    final ArduinoCom arduino = new ArduinoCom(getActivity());
+                    ArduinoCom.OnItemReceivedListener listener = new ArduinoCom.OnItemReceivedListener() {
+                        @Override
+                        public void onStartReceived(boolean connectionStatus) {
+                            if (connectionStatus) {
+                                arduino.setDeviceRotation();
+                            }
+                        }
+
+                        @Override
+                        public void onPointReceived(int pointIndex) {
+                            // EMPTY, DO NOT NEED
+                        }
+
+                        @Override
+                        public void onPressureReceived(boolean success) {
+                            // EMPTY, DO NOT NEED
+                        }
+
+                        @Override
+                        public void onFinished(boolean success) {
+                            // TODO: Display dialog stating success here.
+
+                            arduino.disconnect();
+                        }
+                    };
+
+                    arduino.connect(listener);
+
                     return true;
                 }
             });

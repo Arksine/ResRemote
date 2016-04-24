@@ -1,0 +1,20 @@
+.idc installation instructions
+
+1) Make sure your device has root and is connected to your PC with android debugging enabled
+
+2) Put your idc file in the same directory as adb.exe (typically (ANDROID_SDK_DIR)\platform_tools\)
+
+3) Open a terminal / command prompt, navigate to the directory containing adb.exe, and enter the following commands :
+
+adb root
+adb remount
+adb push Vendor_XXXX_Product_YYYY.idc /system/usr/idc/.
+adb reboot
+
+4) After reboot connect your arduino running the HID Resistive Remote sketch.  It should load the corresponding idc.  This can be verified with the following adb command:
+
+adb shell dumpsys input
+
+That command generates a lot of output.  Navigate to the top and find the header labeled INPUT MANAGER.  Find your device (likely the  last one in this list) and make sure there something listed next to ConfigurationFile:
+
+*Note: In the .idc file, XXXX denotes the Vendor Id, and YYYY denotes the product Id.  Those ids arae listed in the dumpsys output as well.  You can also get them with the lsusb command (adb shell lsusb).

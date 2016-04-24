@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Point;
 import android.hardware.display.DisplayManager;
 import android.preference.PreferenceManager;
+import android.support.annotation.Nullable;
 import android.util.Log;
 import android.view.Display;
 
@@ -15,7 +16,8 @@ public class ArduinoCom extends Thread{
 
     private static final String TAG = "ArduinoCom";
     private Context mContext;
-    private volatile boolean mRunning;
+    private volatile boolean mRunning = false;
+    private volatile boolean mCalSuccess;
 
     SerialHelper mSerialHelper;
     SerialHelper.DeviceReadyListener readyListener;
@@ -46,6 +48,7 @@ public class ArduinoCom extends Thread{
 
 
     public ArduinoCom(Context context) {
+        mCalSuccess = false;
         this.mContext = context;
         String deviceType = PreferenceManager.getDefaultSharedPreferences(mContext)
                 .getString("pref_key_select_device_type", "BT_UINPUT");
@@ -84,14 +87,41 @@ public class ArduinoCom extends Thread{
 
     public void disconnect() {
         mRunning = false;
-        // TODO: should I write an exit command to the arduino here?
+        if (!mCalSuccess) {
+            mSerialHelper.writeString("<CAL_FAIL>");
+        } else {
+            mSerialHelper.writeString("<CAL_SUCCESS>");
+        }
         mSerialHelper.disconnect();
+    }
+
+    /**
+     * Sets the rotation for the device you would like to use
+     */
+    public void setDeviceRotation () {
+        // make sure the device is initialized and connected
+        if (mSerialHelper == null) {
+            return;
+        }
+
+        DisplayManager displayManager = (DisplayManager) mContext.getSystemService(Context.DISPLAY_SERVICE);
+        Display myDisplay = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
+
+        int rotation = myDisplay.getRotation();
+
+        String data = "<SET_ROTATION:" + Integer.toString(rotation) + ">";
+        mSerialHelper.writeString(data);
+
+        // If this function is called outside of the calibration thread, call the function to
+        // exit
+        if (!mRunning) {
+            mOnItemRecdListener.onFinished(true);
+        }
     }
 
     @Override
     public void run() {
         mRunning = true;
-        boolean success = false;
         Point[] touchPoints;
         Point resMinMax;
 
@@ -99,10 +129,15 @@ public class ArduinoCom extends Thread{
         resMinMax = calcResistance();
 
         if (touchPoints != null && mRunning) {
-            success = calcCoefficients(touchPoints[0], touchPoints[1], touchPoints[2], resMinMax);
+            mCalSuccess = calcCoefficients(touchPoints[0], touchPoints[1], touchPoints[2], resMinMax);
         }
 
-        mOnItemRecdListener.onFinished(success);
+        if (mCalSuccess) {
+            // Tell the microcontroller to use the current rotation for coordinates
+            setDeviceRotation();
+        }
+
+        mOnItemRecdListener.onFinished(mCalSuccess);
     }
 
     /**
@@ -158,6 +193,7 @@ public class ArduinoCom extends Thread{
         return ardMsg;
     }
 
+    @Nullable
     private Point[] getTouchPoints() {
         Point[] touchPoints = new Point[3];
         ArduinoMessage screenPt;
@@ -369,6 +405,8 @@ public class ArduinoCom extends Thread{
 
         int tmp;  // all floats will be sent as integers, with 3 decimal places of precision
 
+        // TODO: multiplying by 10000 may make my numbers too large if touch screen coordinates get too big.  Probably not though,
+        //       I would guess that they will stay under 1024 without a more precise ADC measurement
         // Send coefficients to the arduino.  They will be sent as integers with 4 decimals of precision.
         tmp = Math.round(A * 10000);
         if (!sendCalibrationVariable("<$A:" + Integer.toString(tmp) + ">")) return false;
@@ -388,12 +426,9 @@ public class ArduinoCom extends Thread{
         tmp = Math.round(F * 10000);
         if (!sendCalibrationVariable("<$F:" + Integer.toString(tmp) + ">")) return false;
 
-        tmp = Math.round(pressureCoef * 10000);
-        if (!sendCalibrationVariable("<$R:" + Integer.toString(tmp) + ">")) return false;
-
         if (!sendCalibrationVariable("<$M:" + Integer.toString(resistance.x) +">")) return false;
 
-        mSerialHelper.writeString("<WRITE_CALIBRATION>");
+
 
         return true;
     }

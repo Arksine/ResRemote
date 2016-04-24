@@ -26,6 +26,7 @@
     <string name="pref_select_device_default">NO_DEVICE</string>
 
     <string name="pref_start_calibration">Start Calibration</string>
+    <string name="pref_set_controller_orentation">Set Controller to Current Orientation</string>
     <string name="title_activity_calibrate_touch">CalibrateTouchActivity</string>
 
     <!-- Showcaseview strings-->

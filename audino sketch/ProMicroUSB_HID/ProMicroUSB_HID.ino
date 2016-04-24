@@ -1,17 +1,35 @@
-
 /**
  * ResistiveTouchController
  * 
  * A controller that sends x, y, and z data via Serial
  */
 
-#include <TouchScreen.h>
+#include <TouchScreen.h>  
 #include <EEPROMex.h>
 #include <HID-Project.h>
 #include <HID-Settings.h>
 
+/*
+ * The definitions below denote the device rotation you would like to use.  Calibration is done in landscape mode, which
+ * is ROTATION_O for desktop OSes.  However on mobile OSes such as android Rotation 0 is Portrait mode.  There are two options
+ * available to deal with this, calibrate in portrait mode for mobile OSes or select the  device rotation you would like to use. 
+ * Recalibration in portrait mode is very difficult for fixed installations, as MHL/Miracast devices do not allow portrait mode, 
+ * and Chromecast devices scale portrait mode to landscape.
+ * 
+ * So, if you are using a desktop OS the Windows Calibration Tool will always set the rotation to ROTATION_0.  If you are using
+ * Android, the calibration tool will determine which orientation the device is in at the time of calibration (either ROTATION_90 or
+ * ROTATION_270).  If you wish to change the rotation, simply open the calibration tool, make sure the device is in the orientation you
+ * want to use, and select the "Set controller to current orientation" option.
+ * 
+ * One final note...If android properly remapped axes based on the current orientation for devices that aren't orientation aware, 
+ * all of this would be moot.  It doesn't, and to this date I don't know how to force it to do so, or even if there is a way to force it.
+ */
+#define ROTATION_0    0
+#define ROTATION_90   1
+#define ROTATION_180  2
+#define ROTATION_270  3
 
-#define CONFIG_VERSION "rt1"
+#define CONFIG_VERSION "rt2"
 #define MEMORYBASE 32 // where to store and retrieve EEPROM memory
 
 #define YP A0   // must be an analog pin, use "An" notation!
@@ -19,12 +37,13 @@
 #define YM A2   // can be a digital pin
 #define XP A3   // can be a digital pin
 
+#define CALPIN 2  // When this pin is pulled high, device goes into calibration mode
+
 #define MINPRESSURE 10
 #define MAXPRESSURE 1000
 #define TOUCHUPDELAY 100  // min number of milliseconds a touch isn't registered before I send touch up
 #define READLOOPDELAY 10  // min number of milliseconds between loop reads
 #define XPLATE 470             // Resistance across the X-plate of the touchscreen
-#define DEVICEMAXPRESSURE 255  // the maximum pressure the device receives.  It is typically 255
 
 // TODO:  need to measure resistance of the x-plate on the camaro touch screen
 TouchScreen ts = TouchScreen(XP, YP, XM, YM, XPLATE);
@@ -32,10 +51,9 @@ TouchScreen ts = TouchScreen(XP, YP, XM, YM, XPLATE);
 boolean start;
 boolean isCalibrated = false;
 boolean isTouching = false;
-boolean serialStart = true;
 unsigned long readLoopTime = 0;  
 unsigned long touchTime = 0;
-int configAddress = 0;   
+int configAddress = 0; 
 String serialBuffer = ""; 
 
 /**
@@ -51,44 +69,55 @@ struct StoreStruct {
   long D;
   long E;
   long F;
-  long R;          // resistance coefficiient
-  int pressureMax;  // maximum device pressure (typically 255)
-  int resMin;      // minimum resistance measured between the plates
-  
-} storage = {CONFIG_VERSION, 1, 1, 1, 1, 1, 1, 1, MAXPRESSURE, MINPRESSURE};
+  int minResistance;
+  byte rotation;
+} storage = {CONFIG_VERSION, 1, 1, 1, 1, 1, 1, 1, ROTATION_0};
 
 
+// TODO: need to put serial.begin, while(!serial) and serial.flush in a function that is called when the user brings
+//       a pin high.  It doesn't seem to connect without the "while(!serial)"
 void setup() {
-  Serial.begin(9600);
  
-  EEPROM.setMemPool(MEMORYBASE, EEPROMSizeATmega328);
+  pinMode(CALPIN, INPUT);
+ 
+  EEPROM.setMemPool(MEMORYBASE, EEPROMSizeATmega32u4);
   configAddress  = EEPROM.getAddress(sizeof(StoreStruct)); // Size of config object 
   isCalibrated = loadConfig();
 
   if (!isCalibrated) {
-    // set defaults for storage struct, output will be raw coordinates
-    strcpy(storage.version, "nnn"); // the version doesnt match, so don't assign CONFIG_VERSION
-    storage.A = 10000;
+    // set defaults for storage struct, output will be raw coordinates * 10
+    strcpy(storage.version, CONFIG_VERSION);
+    storage.A = 100000;
     storage.B = 0;
     storage.C = 0;
     storage.D = 0;
-    storage.E = 10000;
+    storage.E = 100000;
     storage.F = 0;
-    storage.R = 10000;
-    storage.pressureMax = MAXPRESSURE;
-    storage.resMin = MINPRESSURE;
+    storage.minResistance = MINPRESSURE;
+
+    start = false;
+
+    //Serial.write("<LOG:Device not calibrated>");
     
+    
+  } else {
+
+    //Serial.write("<LOG:Device calibrated>");
+    start = true;
+    SingleMultiTouch.begin();
   }
-
-  start = true;
-
-  Digitizer.begin();
 }
 
 void loop() {
 
-  // Check for incoming commands
-  checkSerial();
+  // go into calibration mode if the calibration pin is pulled high
+  if (digitalRead(CALPIN) == HIGH) {
+    // The switch is momentary, so wait for the pin to go low before continuing
+    while (digitalRead(CALPIN) == HIGH) {
+      delay(20);
+    }
+    calibrate();
+  }
 
   // main loop, app must tell us to start
   if (start && (millis() - readLoopTime) >= READLOOPDELAY) {
@@ -105,7 +134,7 @@ void loop() {
       // I might need to adjust the touch up delay, 50 - 100ms should work
      
         isTouching = false;
-        Digitizer.release();
+        SingleMultiTouch.release();
     }
   }
 
@@ -113,8 +142,16 @@ void loop() {
 
 bool loadConfig() {
   EEPROM.readBlock(configAddress, storage);
-  return (storage.version == CONFIG_VERSION);
+  /*Serial.write("<LOG:Sketch Version-");
+  Serial.write(CONFIG_VERSION);
+  Serial.write(">");
+  Serial.write("<LOG:Storage Version-");
+  Serial.write(storage.version);
+  Serial.write(">");*/
+  return (strcmp(storage.version, CONFIG_VERSION) == 0);
 }
+
+
 
 /**
  * Converts Touch Screen Coordinates to device coordinates
@@ -124,35 +161,73 @@ void sendConvertedCoordinate(int tX, int tY, int tZ) {
     int dY;
     int dZ;
 
-    // Calculate points.  Add  5000 to each coefficient calculation so things are 
-    // rounded correctly. 
-    dX = ((storage.A * tX) + (storage.B * tY) + storage.C + 5000l) / 10000l;
-    dY = ((storage.D * tX) + (storage.E * tY) + storage.F + 5000l) / 10000l;
-    dZ = storage.pressureMax - ((((tZ - storage.resMin) * storage.R) + 5000l) / 10000l);
+    switch (storage.rotation) {
+      case ROTATION_0:
+        dX = ((storage.A * tX) + (storage.B * tY) + storage.C + 5000l) / 10000l;
+        dY = ((storage.D * tX) + (storage.E * tY) + storage.F + 5000l) / 10000l;  
+        break;
+      case ROTATION_90:
+        dY = ((storage.A * tX) + (storage.B * tY) + storage.C + 5000l) / 10000l;
+        dX = 10000 - (((storage.D * tX) + (storage.E * tY) + storage.F + 5000l) / 10000l);
+        break;
+      case ROTATION_180:
+        dX = 10000 - ((storage.A * tX) + (storage.B * tY) + storage.C + 5000l) / 10000l;
+        dY = 10000 - ((storage.D * tX) + (storage.E * tY) + storage.F + 5000l) / 10000l;  
+        break;
+      case ROTATION_270:
+        dY = 10000 - (((storage.A * tX) + (storage.B * tY) + storage.C + 5000l) / 10000l);
+        dX = ((storage.D * tX) + (storage.E * tY) + storage.F + 5000l) / 10000l;  
+        break;
+      default:
+        dX = ((storage.A * tX) + (storage.B * tY) + storage.C + 5000l) / 10000l;
+        dY = ((storage.D * tX) + (storage.E * tY) + storage.F + 5000l) / 10000l;  
+      
+    }
 
-    Digitizer.moveTo(dX, dY);
+    dZ = MAXPRESSURE - (tZ - storage.minResistance);
+
+    SingleMultiTouch.moveTo(dX, dY);
+}
+
+void calibrate() {
+
+  start = false;  // probably don't need this as this function is blocking, but just in case
+  SingleMultiTouch.end();
+  
+  // Open the serial port
+  Serial.begin(9600);
+  while (!Serial);
+  Serial.flush();
+
+  while(checkSerial()) {
+    // The user can use the same momentary button that enters calibration to exit
+    // calibration
+    if (digitalRead(CALPIN) == HIGH) {
+      // The switch is momentary, so wait for the pin to go low before continuing
+      while (digitalRead(CALPIN) == HIGH) {
+        delay(20);      
+      }
+      break;
+    }
+  }
+
+
+  if (isCalibrated) {
+    start = true;  // go ahead and restart the loop
+    SingleMultiTouch.begin();
+  }
+
+  // close the serial port
+  Serial.end();
 }
 
 /**
  * Listens for a formatted serial packet
  *
  */
-void checkSerial() {
+boolean checkSerial() {
 
-  if (!Serial) {
-    // exit if there is no serial connection
-    return;
-    
-  } else if (serialStart) {
-    // flush serial if the serial connection was just opened
-    Serial.flush();
-
-    if (!isCalibrated) {
-      // TODO: Log that the device is not calibrated?
-      // Serial.write("<LOG:Device not calibrated>");
-    }
-    serialStart =  false;
-  }
+  boolean calResume = true;
   
   if (Serial.available() > 0)
   {
@@ -164,24 +239,27 @@ void checkSerial() {
     }
     else if (ch == '>') {
       // end of packet, parse it
-      checkPacket();
+      calResume = checkPacket();
     }
     else {
       // part of the stream, add it to the buffer
       serialBuffer += ch;
     }
   }
+
+  return calResume;
 }
 
 /**
  * takes a formatted incoming serial packet and checks it against valid commands,
  * which are then executed
  */
-void checkPacket() {
+boolean checkPacket() {
+
+  boolean calResume = true;
   
   if (serialBuffer == "") {
     // no command received
-    return;
   }
   else if (serialBuffer == "CAL_POINT") {
     // Get a single point from the touch screen and send it
@@ -200,22 +278,27 @@ void checkPacket() {
     // Toggles the touch screen switcher
     // TODO: Bring whichever pin is connected to touchscreen to high here
   }
-  else if (serialBuffer == "WRITE_CALIBRATION") {
-    // write calibration to EEPROM
+  else if (serialBuffer == "CAL_FAIL") {
+    // break calibration loop
+    calResume = false;
+  }
+  else if (serialBuffer == "CAL_SUCCESS") {
+    
+    EEPROM.updateBlock(configAddress, storage);
     isCalibrated = true;
-    strcpy(storage.version, CONFIG_VERSION);
-    storage.pressureMax = DEVICEMAXPRESSURE; // TODO: Get this from device
-    EEPROM.writeBlock(configAddress, storage);
-    start = true;  // go ahead and restart the loop
-  }  
+    calResume = false;
+  }
   else if (serialBuffer == "ERROR") {
     // TODO: should probably handle this error somehow
-    return;
+    calResume = false;
   }
   else if(serialBuffer.startsWith("$")) {
     // this is a command to store a calibration variable, we don't need to
     // send it the control character
     storeCalibration(serialBuffer.substring(1));
+  }
+  else if (serialBuffer.startsWith("SET_ROTATION")) {
+    storage.rotation = atoi(serialBuffer.substring(13).c_str());
   }
   else {
     // unknown command
@@ -226,7 +309,8 @@ void checkPacket() {
     logString = "<LOG:UKNOWN COMMAND " + logString + ">";
     Serial.print(logString);
   }
- 
+
+  return calResume;
 }
 
 /**
@@ -342,20 +426,12 @@ void storeCalibration(String data) {
     Serial.print(storage.F);
     Serial.print(">");
     
-  } else if (varType == "R") {
-
-    storage.R = atol(value.c_str());
-    Serial.print("<LOG:OK>");
-    Serial.print("<LOG:RESCOEF="); 
-    Serial.print(storage.R);
-    Serial.print(">");   
-  
   } else if (varType == "M") {
 
-    storage.resMin = atoi(value.c_str());
+    storage.minResistance = atoi(value.c_str());
     Serial.print("<LOG:OK>");
-    Serial.print("<LOG:RESMIN="); 
-    Serial.print(storage.resMin);
+    Serial.print("<LOG:minResistance="); 
+    Serial.print(storage.minResistance);
     Serial.print(">");
     
   } else {

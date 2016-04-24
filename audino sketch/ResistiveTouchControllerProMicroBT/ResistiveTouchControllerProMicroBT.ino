@@ -63,7 +63,7 @@ void setup() {
   while (!Serial1);
   Serial1.flush();
 
-  EEPROM.setMemPool(MEMORYBASE, EEPROMSizeATmega328);
+  EEPROM.setMemPool(MEMORYBASE, EEPROMSizeATmega32u4);
   configAddress  = EEPROM.getAddress(sizeof(StoreStruct)); // Size of config object 
   isCalibrated = loadConfig();
 
@@ -98,7 +98,7 @@ void loop() {
 
 bool loadConfig() {
   EEPROM.readBlock(configAddress, storage);
-  return (storage.version == CONFIG_VERSION);
+  return (strcmp(storage.version, CONFIG_VERSION) == 0);
 }
 
 /**

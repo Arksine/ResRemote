@@ -18,4 +18,8 @@
         android:key="pref_key_start_calibration"
         android:title="@string/pref_start_calibration" >
     </PreferenceScreen>
+    <PreferenceScreen
+        android:key="pref_key_set_controller_orientation"
+        android:title="@string/pref_set_controller_orentation" >
+    </PreferenceScreen>
 </PreferenceScreen>

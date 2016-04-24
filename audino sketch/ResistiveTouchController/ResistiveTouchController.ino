@@ -93,7 +93,7 @@ void loop() {
 
 bool loadConfig() {
   EEPROM.readBlock(configAddress, storage);
-  return (storage.version == CONFIG_VERSION);
+  return (strcmp(storage.version, CONFIG_VERSION) == 0);
 }
 
 /**
