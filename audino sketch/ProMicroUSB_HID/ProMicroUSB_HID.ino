@@ -38,6 +38,7 @@
 #define XP A3   // can be a digital pin
 
 #define CALPIN 2  // When this pin is pulled high, device goes into calibration mode
+#define LEDPIN 3
 
 #define MINPRESSURE 10
 #define MAXPRESSURE 1000
@@ -73,12 +74,10 @@ struct StoreStruct {
   byte rotation;
 } storage = {CONFIG_VERSION, 1, 1, 1, 1, 1, 1, 1, ROTATION_0};
 
-
-// TODO: need to put serial.begin, while(!serial) and serial.flush in a function that is called when the user brings
-//       a pin high.  It doesn't seem to connect without the "while(!serial)"
 void setup() {
- 
+  
   pinMode(CALPIN, INPUT);
+  pinMode(LEDPIN, OUTPUT);
  
   EEPROM.setMemPool(MEMORYBASE, EEPROMSizeATmega32u4);
   configAddress  = EEPROM.getAddress(sizeof(StoreStruct)); // Size of config object 
@@ -104,7 +103,7 @@ void setup() {
 
     //Serial.write("<LOG:Device calibrated>");
     start = true;
-    SingleMultiTouch.begin();
+    MultiTouch.begin();
   }
 }
 
@@ -114,7 +113,7 @@ void loop() {
   if (digitalRead(CALPIN) == HIGH) {
     // The switch is momentary, so wait for the pin to go low before continuing
     while (digitalRead(CALPIN) == HIGH) {
-      delay(20);
+      delay(10);
     }
     calibrate();
   }
@@ -134,7 +133,7 @@ void loop() {
       // I might need to adjust the touch up delay, 50 - 100ms should work
      
         isTouching = false;
-        SingleMultiTouch.release();
+        MultiTouch.release();
     }
   }
 
@@ -186,17 +185,27 @@ void sendConvertedCoordinate(int tX, int tY, int tZ) {
 
     dZ = MAXPRESSURE - (tZ - storage.minResistance);
 
-    SingleMultiTouch.moveTo(dX, dY);
+    MultiTouch.moveTo(dX, dY);
 }
 
 void calibrate() {
-
-  start = false;  // probably don't need this as this function is blocking, but just in case
-  SingleMultiTouch.end();
+  digitalWrite(LEDPIN, HIGH);
+    
+  MultiTouch.end();
   
   // Open the serial port
   Serial.begin(9600);
-  while (!Serial);
+  while (!Serial) {
+    // If we accidentally enter serial mode without a connection, we can exit with the
+    // same switch we used to enter
+    if (digitalRead(CALPIN) == HIGH) {
+      // The switch is momentary, so wait for the pin to go low before continuing
+      while (digitalRead(CALPIN) == HIGH) {
+        delay(10);      
+      }
+      goto quit;   // bypass the serial functions and exit
+    }
+  }
   Serial.flush();
 
   while(checkSerial()) {
@@ -211,13 +220,14 @@ void calibrate() {
     }
   }
 
+  quit:
+  digitalWrite(LEDPIN, LOW);
 
   if (isCalibrated) {
     start = true;  // go ahead and restart the loop
-    SingleMultiTouch.begin();
+    MultiTouch.begin();
   }
 
-  // close the serial port
   Serial.end();
 }
 
@@ -299,6 +309,10 @@ boolean checkPacket() {
   }
   else if (serialBuffer.startsWith("SET_ROTATION")) {
     storage.rotation = atoi(serialBuffer.substring(13).c_str());
+    Serial.print("<LOG:OK>");
+    Serial.print("<LOG:Rotation="); 
+    Serial.print(storage.rotation);
+    Serial.print(">");
   }
   else {
     // unknown command
@@ -370,7 +384,6 @@ void getPressure () {
  * Retreives and writes calibration coefficients calculated by the application to EEPROM
  */
 void storeCalibration(String data) {
-  isCalibrated = false;
   
   String varType;
   String value;

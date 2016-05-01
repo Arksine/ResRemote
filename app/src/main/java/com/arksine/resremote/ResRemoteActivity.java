@@ -2,14 +2,17 @@ package com.arksine.resremote;
 
 import android.app.Activity;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
 import android.os.Bundle;
 import android.preference.PreferenceScreen;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -18,8 +21,6 @@ import java.util.ArrayList;
 public class ResRemoteActivity extends Activity {
 
     private static String TAG = "ResRemoteActivity";
-
-    private boolean bluetoothEnabled = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,28 +33,22 @@ public class ResRemoteActivity extends Activity {
 
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == R.integer.REQUEST_ENABLE_BT) {
-            if (resultCode == RESULT_OK) {
-                bluetoothEnabled = true;
-            }
-            else if (resultCode == RESULT_CANCELED) {
-                Log.i(TAG, "Error starting bluetooth device");
-                Toast.makeText(this, "Error starting bluetooth device",
-                        Toast.LENGTH_SHORT).show();
-                bluetoothEnabled = false;
-            }
-        }
-    }
-
-
     public static class SettingsFragment extends PreferenceFragment {
+
+        public static final String ACTION_DEVICE_CHANGED = "com.arksine.resremote.ACTION_DEVICE_CHANGED";
 
         SerialHelper mSerialHelper;
         private String mDeviceType;
+
+        private final BroadcastReceiver deviceListReciever = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent.getAction();
+                if (action.equals(ACTION_DEVICE_CHANGED)) {
+                    populateDeviceListView();
+                }
+            }
+        };
 
         @Override
         public void onCreate(Bundle savedInstanceState) {
@@ -152,7 +147,17 @@ public class ResRemoteActivity extends Activity {
                     return true;
                 }
             });
+
+            IntentFilter filter = new IntentFilter(ACTION_DEVICE_CHANGED);
+            LocalBroadcastManager.getInstance(getActivity()).registerReceiver(deviceListReciever, filter);
         }
+
+        @Override
+        public void onDestroy() {
+            super.onDestroy();
+            LocalBroadcastManager.getInstance(getActivity()).unregisterReceiver(deviceListReciever);
+        }
+
 
         private void populateDeviceListView() {
 

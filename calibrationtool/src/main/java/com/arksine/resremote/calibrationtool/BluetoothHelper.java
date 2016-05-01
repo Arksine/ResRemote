@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -26,8 +27,9 @@ public class BluetoothHelper implements SerialHelper {
 
     private static String TAG = "BluetoothHelper";
 
+    public static final String ACTION_DEVICE_CHANGED = "com.arksine.resremote.ACTION_DEVICE_CHANGED";
+
     private Context mContext = null;
-    private Activity mActivity = null;
 
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothSocket mSocket;
@@ -43,19 +45,22 @@ public class BluetoothHelper implements SerialHelper {
 
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
+
             if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
                 synchronized (this) {
                     int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
                             BluetoothAdapter.STATE_OFF);
 
-                    if (state == BluetoothAdapter.STATE_TURNING_ON) {
-                        Toast.makeText(mContext, "Bluetooth Turning On", Toast.LENGTH_SHORT).show();
-                    } else if (state == BluetoothAdapter.STATE_ON) {
+                    if (state == BluetoothAdapter.STATE_ON || state == BluetoothAdapter.STATE_TURNING_OFF) {
 
-                        // TODO: Broadcast an intent back to the main activity telling it to repopulate the device list
+                        Intent devChanged = new Intent(ACTION_DEVICE_CHANGED);
+                        LocalBroadcastManager.getInstance(mContext).sendBroadcast(devChanged);
                     }
 
                 }
+            } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
+                Intent devChanged = new Intent(ACTION_DEVICE_CHANGED);
+                LocalBroadcastManager.getInstance(mContext).sendBroadcast(devChanged);
             }
 
         }
@@ -67,12 +72,7 @@ public class BluetoothHelper implements SerialHelper {
         initBluetooth();
     }
 
-    public BluetoothHelper(Activity activity) {
-        mActivity = activity;
-        mContext = mActivity.getApplicationContext();
 
-        initBluetooth();
-    }
 
     /**
      * Initializes bluetooth adapter, makes sure that it is turned on and prompts
@@ -98,12 +98,7 @@ public class BluetoothHelper implements SerialHelper {
         if (!mBluetoothAdapter.isEnabled()) {
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
 
-            if (mActivity == null) {
-                mContext.startActivity(enableBtIntent);
-            }
-            else {
-                mActivity.startActivityForResult(enableBtIntent, R.integer.REQUEST_ENABLE_BT);
-            }
+            mContext.startActivity(enableBtIntent);
 
         }
 

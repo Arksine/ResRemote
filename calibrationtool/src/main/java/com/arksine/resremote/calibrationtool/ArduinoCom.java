@@ -16,7 +16,7 @@ public class ArduinoCom extends Thread{
 
     private static final String TAG = "ArduinoCom";
     private Context mContext;
-    private volatile boolean mRunning = false;
+    private volatile boolean mRunning = true;
     private volatile boolean mCalSuccess;
 
     SerialHelper mSerialHelper;
@@ -63,8 +63,10 @@ public class ArduinoCom extends Thread{
         }
 
         readyListener = new SerialHelper.DeviceReadyListener() {
+
             @Override
             public void OnDeviceReady(boolean deviceReadyStatus) {
+
                 mOnItemRecdListener.onStartReceived(deviceReadyStatus);
             }
         };
@@ -87,16 +89,15 @@ public class ArduinoCom extends Thread{
 
     public void disconnect() {
         mRunning = false;
-        if (!mCalSuccess) {
-            mSerialHelper.writeString("<CAL_FAIL>");
-        } else {
+        if (mCalSuccess) {
             mSerialHelper.writeString("<CAL_SUCCESS>");
         }
         mSerialHelper.disconnect();
     }
 
     /**
-     * Sets the rotation for the device you would like to use
+     * Sets the rotation for the device controller based on the current orientation of the android device.
+     * It executes a read, which is blocking, so do not call in UI thread.
      */
     public void setDeviceRotation () {
         // make sure the device is initialized and connected
@@ -111,12 +112,22 @@ public class ArduinoCom extends Thread{
 
         String data = "<SET_ROTATION:" + Integer.toString(rotation) + ">";
         mSerialHelper.writeString(data);
-
-        // If this function is called outside of the calibration thread, call the function to
-        // exit
-        if (!mRunning) {
-            mOnItemRecdListener.onFinished(true);
+        ArduinoMessage receipt = readMessage();
+        if (receipt == null) {
+            mOnItemRecdListener.onFinished(false);
+            return;
         }
+        if (receipt.desc.equals("OK")) {
+            ArduinoMessage value = readMessage();
+            Log.i(TAG, value.desc);
+            mCalSuccess = true;
+            mOnItemRecdListener.onFinished(true);
+        } else {
+            Log.e(TAG, receipt.command + " " + receipt.desc);
+            mSerialHelper.writeString("<ERROR>");
+            mOnItemRecdListener.onFinished(false);
+        }
+
     }
 
     @Override
@@ -135,9 +146,10 @@ public class ArduinoCom extends Thread{
         if (mCalSuccess) {
             // Tell the microcontroller to use the current rotation for coordinates
             setDeviceRotation();
+        } else {
+            mOnItemRecdListener.onFinished(false);
         }
 
-        mOnItemRecdListener.onFinished(mCalSuccess);
     }
 
     /**
@@ -186,7 +198,7 @@ public class ArduinoCom extends Thread{
 
         }
         else {
-            Log.e(TAG, "Issue parsing string, invalid data recd");
+            Log.e(TAG, "Issue parsing string, invalid data recd: " + message);
             ardMsg = null;
         }
 
@@ -324,13 +336,14 @@ public class ArduinoCom extends Thread{
      */
     private boolean calcCoefficients(Point T1, Point T2, Point T3, Point resistance) {
 
+        //TODO: is double accurate enough, or should I use BigDecimal?
         // Calibration coefficients
-        float A;
-        float B;
-        float C;
-        float D;
-        float E;
-        float F;
+        double A;
+        double B;
+        double C;
+        double D;
+        double E;
+        double F;
 
         Point D1;     // Right Center device coordinate
         Point D2;     // Bottom Center device coordinate
@@ -396,39 +409,30 @@ public class ArduinoCom extends Thread{
         Log.i(TAG, "E coefficient: " + E);
         Log.i(TAG, "F coefficient: " + F);
 
-
-        // Now calculate the pressure coefficient
-        int resDifference = resistance.y - resistance.x;
-        float pressureCoef = 255.0f / resDifference;  // (pressure is 255 - (resistance - resMin)*pressureCoef)
-
-        Log.i(TAG, "Resistance coefficient:" + pressureCoef);
-
-        int tmp;  // all floats will be sent as integers, with 3 decimal places of precision
+        long tmp;  // all floats will be sent as integers, with 3 decimal places of precision
 
         // TODO: multiplying by 10000 may make my numbers too large if touch screen coordinates get too big.  Probably not though,
         //       I would guess that they will stay under 1024 without a more precise ADC measurement
         // Send coefficients to the arduino.  They will be sent as integers with 4 decimals of precision.
         tmp = Math.round(A * 10000);
-        if (!sendCalibrationVariable("<$A:" + Integer.toString(tmp) + ">")) return false;
+        if (!sendCalibrationVariable("<$A:" + Long.toString(tmp) + ">")) return false;
 
         tmp = Math.round(B * 10000);
-        if (!sendCalibrationVariable("<$B:" + Integer.toString(tmp) + ">")) return false;
+        if (!sendCalibrationVariable("<$B:" + Long.toString(tmp) + ">")) return false;
 
         tmp = Math.round(C * 10000);
-        if (!sendCalibrationVariable("<$C:" + Integer.toString(tmp) + ">")) return false;
+        if (!sendCalibrationVariable("<$C:" + Long.toString(tmp) + ">")) return false;
 
         tmp = Math.round(D * 10000);
-        if (!sendCalibrationVariable("<$D:" + Integer.toString(tmp) + ">")) return false;
+        if (!sendCalibrationVariable("<$D:" + Long.toString(tmp) + ">")) return false;
 
         tmp = Math.round(E * 10000);
-        if (!sendCalibrationVariable("<$E:" + Integer.toString(tmp) + ">")) return false;
+        if (!sendCalibrationVariable("<$E:" + Long.toString(tmp) + ">")) return false;
 
         tmp = Math.round(F * 10000);
-        if (!sendCalibrationVariable("<$F:" + Integer.toString(tmp) + ">")) return false;
+        if (!sendCalibrationVariable("<$F:" + Long.toString(tmp) + ">")) return false;
 
         if (!sendCalibrationVariable("<$M:" + Integer.toString(resistance.x) +">")) return false;
-
-
 
         return true;
     }

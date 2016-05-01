@@ -334,15 +334,7 @@ void storeCalibration(String data) {
     Serial.print(storage.F);
     Serial.print(">");
     
-  } else if (varType == "R") {
-
-    storage.R = atol(value.c_str());
-    Serial.print("<LOG:OK>");
-    Serial.print("<LOG:RESCOEF="); 
-    Serial.print(storage.R);
-    Serial.print(">");   
-  
-  } else if (varType == "M") {
+  }  else if (varType == "M") {
 
     storage.resMin = atoi(value.c_str());
     Serial.print("<LOG:OK>");

@@ -49,27 +49,19 @@ public class NativeInput {
         xMax = screenSizeX - 1;
         yMax = screenSizeY - 1;
 
-        // TODO:  I may not need to close and reopen the the device when the orientation changes.
-        //        its possible that android changes the x and y values for me.
-        // If uinput is already open, close it first
-        if (uinputOpen) {
-            closeVirtualDevice();
-            // Sleep for 200 ms so the device has a chance to be destroyed
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException e){}
-        }
-        File uinputFile = new File("/dev/uinput");
-        if (uinputFile.exists()) {
-            if(uinputFile.canRead()){
-                uinputOpen = openUinput(screenSizeX, screenSizeY);
+        // Open uinput if it is not already open
+        if (!uinputOpen) {
+
+            File uinputFile = new File("/dev/uinput");
+            if (uinputFile.exists()) {
+                if (uinputFile.canRead()) {
+                    uinputOpen = openUinput(screenSizeX, screenSizeY);
+                } else {
+                    Log.e(TAG, "Unable to read /dev/uinput, are permissions set correctly?");
+                }
+            } else {
+                Log.e(TAG, "/dev/input does not exist on your device");
             }
-            else {
-                Log.e(TAG, "Unable to read /dev/uinput, are permissions set correctly?");
-            }
-        }
-        else {
-            Log.e(TAG, "/dev/input does not exist on your device");
         }
     }
 

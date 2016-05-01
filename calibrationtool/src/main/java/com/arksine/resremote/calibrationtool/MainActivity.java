@@ -1,14 +1,20 @@
 package com.arksine.resremote.calibrationtool;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
-import android.preference.PreferenceManager;
 import android.preference.PreferenceScreen;
+import android.support.v4.content.LocalBroadcastManager;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 
 import java.util.ArrayList;
 
@@ -28,8 +34,19 @@ public class MainActivity extends AppCompatActivity {
 
     public static class SettingsFragment extends PreferenceFragment {
 
+        public static final String ACTION_DEVICE_CHANGED = "com.arksine.resremote.ACTION_DEVICE_CHANGED";
         private SerialHelper mSerialHelper;
         private String mDeviceType;
+
+        private final BroadcastReceiver deviceListReciever = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent.getAction();
+                if (action.equals(ACTION_DEVICE_CHANGED)) {
+                    populateDeviceListView();
+                }
+            }
+        };
 
         @Override
         public void onCreate(Bundle savedInstanceState) {
@@ -102,39 +119,85 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public boolean onPreferenceClick(Preference preference) {
 
+                    AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+                    builder.setMessage(R.string.orientation_dialog_message)
+                            .setTitle(R.string.orientation_dialog_title)
+                            .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    // No need to do anything here
+                                }
+                            });
+
+                    final AlertDialog alert = builder.create();
+                    alert.show();
+                    alert.getButton(DialogInterface.BUTTON_POSITIVE).setVisibility(View.INVISIBLE);
                     final ArduinoCom arduino = new ArduinoCom(getActivity());
-                    ArduinoCom.OnItemReceivedListener listener = new ArduinoCom.OnItemReceivedListener() {
-                        @Override
-                        public void onStartReceived(boolean connectionStatus) {
-                            if (connectionStatus) {
-                                arduino.setDeviceRotation();
+
+                    Runnable connectRunnable = new Runnable() {
+                        ArduinoCom.OnItemReceivedListener listener = new ArduinoCom.OnItemReceivedListener() {
+                            @Override
+                            public void onStartReceived(boolean connectionStatus) {
+                                if (connectionStatus) {
+                                    arduino.setDeviceRotation();
+                                }
+                                else {
+                                    Runnable uiRunnable = new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            alert.setMessage(getString(R.string.orientation_dialog_failed));
+                                            alert.getButton(DialogInterface.BUTTON_POSITIVE).setVisibility(View.VISIBLE);
+                                        }
+                                    };
+                                    getActivity().runOnUiThread(uiRunnable);
+                                }
                             }
-                        }
 
+                            @Override
+                            public void onPointReceived(int pointIndex) {
+                                // EMPTY, DO NOT NEED
+                            }
+
+                            @Override
+                            public void onPressureReceived(boolean success) {
+                                // EMPTY, DO NOT NEED
+                            }
+
+                            @Override
+                            public void onFinished(boolean success) {
+                                Runnable uiRunnable = new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        alert.setMessage(getString(R.string.orientation_dialog_finished));
+                                        alert.getButton(DialogInterface.BUTTON_POSITIVE).setVisibility(View.VISIBLE);
+                                    }
+                                };
+                                getActivity().runOnUiThread(uiRunnable);
+                                arduino.disconnect();
+                            }
+                        };
                         @Override
-                        public void onPointReceived(int pointIndex) {
-                            // EMPTY, DO NOT NEED
-                        }
-
-                        @Override
-                        public void onPressureReceived(boolean success) {
-                            // EMPTY, DO NOT NEED
-                        }
-
-                        @Override
-                        public void onFinished(boolean success) {
-                            // TODO: Display dialog stating success here.
-
-                            arduino.disconnect();
+                        public void run() {
+                            arduino.connect(listener);
                         }
                     };
 
-                    arduino.connect(listener);
+                    Thread connectThread = new Thread(connectRunnable);
+                    connectThread.start();
 
                     return true;
                 }
             });
 
+            IntentFilter filter = new IntentFilter(ACTION_DEVICE_CHANGED);
+            LocalBroadcastManager.getInstance(getActivity()).registerReceiver(deviceListReciever, filter);
+
+        }
+
+        @Override
+        public void onDestroy() {
+            super.onDestroy();
+            LocalBroadcastManager.getInstance(getActivity()).unregisterReceiver(deviceListReciever);
         }
 
         private void populateDeviceListView() {
@@ -161,7 +224,7 @@ public class MainActivity extends AppCompatActivity {
             CharSequence[] entryValues;
 
             if (deviceList == null || deviceList.isEmpty()) {
-                Log.i(TAG, "No compatible bluetooth devices found on system");
+                Log.i(TAG, "No compatible devices found on system");
                 entries = new CharSequence[1];
                 entryValues = new CharSequence[1];
 

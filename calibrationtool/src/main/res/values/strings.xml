@@ -29,9 +29,14 @@
     <string name="pref_set_controller_orentation">Set Controller to Current Orientation</string>
     <string name="title_activity_calibrate_touch">CalibrateTouchActivity</string>
 
+    <string name="orientation_dialog_title">Set Controller Orientation</string>
+    <string name="orientation_dialog_message">Connecting, make sure the device is in serial mode</string>
+    <string name="orientation_dialog_failed">Failed to connect!</string>
+    <string name="orientation_dialog_finished">Orientation set!</string>
+
     <!-- Showcaseview strings-->
     <string name="cal_title">Touch Screen Calibration</string>
-    <string name="cal_connect">Connecting to device</string>
+    <string name="cal_connect">Connecting, make sure the device is in serial mode</string>
     <string name="cal_point_text">Please touch the indicated point</string>
     <string name="cal_pressure_title">Pressure Calibration</string>
     <string name="cal_pressure_text">Touch the screen, slowly increasing pressure</string>

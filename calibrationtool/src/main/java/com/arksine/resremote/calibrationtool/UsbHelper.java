@@ -9,6 +9,7 @@ import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.os.Build;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
 import com.felhr.deviceids.CH34xIds;
@@ -34,6 +35,9 @@ public class UsbHelper implements SerialHelper {
     private static final String TAG = "UsbHelper";
 
     private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
+    public static final String ACTION_USB_ATTACHED = "android.hardware.usb.action.USB_DEVICE_ATTACHED";
+    public static final String ACTION_USB_DETACHED = "android.hardware.usb.action.USB_DEVICE_DETACHED";
+    public static final String ACTION_DEVICE_CHANGED = "com.arksine.resremote.ACTION_DEVICE_CHANGED";
     private static final int BAUD_RATE = 9600; // BaudRate. Change this value if you need
 
     private Context mContext;
@@ -44,6 +48,38 @@ public class UsbHelper implements SerialHelper {
 
     private volatile boolean serialPortConnected = false;
     private static SerialHelper.DeviceReadyListener mReadyListener;
+
+    private volatile boolean requestApproved = false;
+    private volatile boolean requestFinished = false;
+    private boolean usbReceiverRegistered = false;
+    private final BroadcastReceiver mUsbReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action.equals(ACTION_USB_PERMISSION)) {
+                synchronized (this) {
+                    UsbDevice uDev = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                    boolean accessGranted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false);
+                    if (accessGranted) {
+                        if (uDev != null) {
+                            requestApproved = true;
+                        } else {
+                            Log.d(TAG, "USB Device not valid");
+                        }
+                    } else {
+                        Log.d(TAG, "permission denied for device " + uDev);
+                    }
+                    requestFinished = true;
+                }
+            } else if (action.equals(ACTION_USB_ATTACHED) || action.equals(ACTION_USB_DETACHED)) {
+                // send a broadcast for the main activity to repopulate the device list if a device
+                // is connected or disconnected
+                Intent devChanged = new Intent(ACTION_DEVICE_CHANGED);
+                LocalBroadcastManager.getInstance(mContext).sendBroadcast(devChanged);
+                Log.i(TAG, "Usb device attached or removed");
+            }
+        }
+    };
 
    LinkedBlockingQueue<Byte> serialBuffer;
 
@@ -60,9 +96,7 @@ public class UsbHelper implements SerialHelper {
                     Log.e(TAG, "Unable to add incoming byte to queue", e);
                 }
             }
-
         }
-
     };
 
 
@@ -71,6 +105,12 @@ public class UsbHelper implements SerialHelper {
         mUsbManager = (UsbManager) mContext.getSystemService(Context.USB_SERVICE);
 
         serialBuffer = new LinkedBlockingQueue<>(128);
+
+        IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
+        filter.addAction(ACTION_USB_ATTACHED);
+        filter.addAction(ACTION_USB_DETACHED);
+        mContext.registerReceiver(mUsbReceiver, filter);
+        usbReceiverRegistered = true;
     }
 
     public ArrayList<String> enumerateDevices() {
@@ -147,6 +187,11 @@ public class UsbHelper implements SerialHelper {
             mSerialPort = null;
         }
         serialPortConnected = false;
+
+        if (usbReceiverRegistered) {
+            mContext.unregisterReceiver(mUsbReceiver);
+            usbReceiverRegistered = false;
+        }
     }
 
     public boolean writeString(String data) {
@@ -198,39 +243,8 @@ public class UsbHelper implements SerialHelper {
     // This thread opens a usb serial connection on the specified device
     private class ConnectionThread extends Thread {
 
-        private volatile boolean requestApproved = false;
-        private volatile boolean requestFinished = false;
-
-        private final BroadcastReceiver mUsbReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                String action = intent.getAction();
-                if (action.equals(ACTION_USB_PERMISSION)) {
-                    synchronized (this) {
-                        UsbDevice uDev = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
-                        boolean accessGranted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false);
-                        if (accessGranted) {
-                            if (uDev != null) {
-                               requestApproved = true;
-                            } else {
-                                Log.d(TAG, "USB Device not valid");
-                            }
-                        } else {
-                            Log.d(TAG, "permission denied for device " + uDev);
-                        }
-                        requestFinished = true;
-                    }
-                }
-
-            }
-        };
-
         @Override
         public void run() {
-
-            IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
-            mContext.registerReceiver(mUsbReceiver, filter);
-
             PendingIntent mPendingIntent = PendingIntent.getBroadcast(mContext, 0, new Intent(ACTION_USB_PERMISSION), 0);
             mUsbManager.requestPermission(mUsbDevice, mPendingIntent);
 
@@ -279,9 +293,6 @@ public class UsbHelper implements SerialHelper {
                 Log.i(TAG, "Serial Device not supported");
                 mReadyListener.OnDeviceReady(false);
             }
-
-            mContext.unregisterReceiver(mUsbReceiver);
         }
     }
-
 }

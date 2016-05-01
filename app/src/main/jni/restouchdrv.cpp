@@ -54,7 +54,7 @@ extern "C" {
 		uinp.absmin[ABS_MT_TRACKING_ID] = 0;
 		uinp.absmax[ABS_MT_TRACKING_ID] = 65535;
 		uinp.absmin[ABS_MT_PRESSURE] = 0;
-		uinp.absmax[ABS_MT_PRESSURE] = 255;
+		uinp.absmax[ABS_MT_PRESSURE] = 1000;
 
 		// Setup the uinput device
 		int ret = 0;
