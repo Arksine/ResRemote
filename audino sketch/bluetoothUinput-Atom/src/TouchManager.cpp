@@ -5,8 +5,7 @@
  */
 #include "TouchManager.h"
 
-TouchManager::TouchManager() : ts(XP, YP, XM, YM, XPLATE), mySerial(),
-  storageManager() {
+TouchManager::TouchManager() : ts(XP, YP, XM, YM, XPLATE), storageManager() {
   storage      = storageManager.getStorage();
   loopDelay    = 0;
   touchDelay   = 0;
@@ -16,11 +15,6 @@ TouchManager::TouchManager() : ts(XP, YP, XM, YM, XPLATE), mySerial(),
 }
 
 TouchManager::~TouchManager() {}
-
-void TouchManager::startSerial(long speed) {
-  mySerial.begin(speed);
-  digitalWrite(LEDPIN, HIGH);
-}
 
 void TouchManager::loopFunction() {
   checkSerial();
@@ -36,16 +30,16 @@ void TouchManager::loopFunction() {
       touchDelay = millis();
     } else if (isTouching && ((millis() - touchDelay) >= TOUCHUPDELAY)) {
       // I might need to adjust the touch up delay, 50 - 100ms should work
-      mySerial.print("<UP:0:0:0>");
+      uartSerial.print("<UP:0:0:0>");
       isTouching = false;
     }
   }
 }
 
 void TouchManager::checkSerial() {
-  if (mySerial.available() > 0)
+  if (uartSerial.available() > 0)
   {
-    char ch = mySerial.read();
+    char ch = uartSerial.read();
 
     if (ch == '<') {
       // packet is beginning, clear buffer
@@ -71,13 +65,13 @@ void TouchManager::sendSerialCoordinate(int tX, int tY, int tZ) {
   dY = ((storage->D * tX) + (storage->E * tY) + storage->F + 5000l) / 10000l;
   dZ = MAXPRESSURE - (tZ - storage->minResistance);
 
-  mySerial.print("<DOWN:");
-  mySerial.print(dX);
-  mySerial.print(":");
-  mySerial.print(dY);
-  mySerial.print(":");
-  mySerial.print(dZ);
-  mySerial.print(">");
+  uartSerial.print("<DOWN:");
+  uartSerial.print(dX);
+  uartSerial.print(":");
+  uartSerial.print(dY);
+  uartSerial.print(":");
+  uartSerial.print(dZ);
+  uartSerial.print(">");
 }
 
 void TouchManager::processCommand(String command) {
@@ -94,12 +88,12 @@ void TouchManager::processCommand(String command) {
   } else if (command == "CAL_POINT") {
     // Get a single point from the touch screen and send it
 
-    // mySerial.print("<LOG:GET_POINT_OK>");
+    // uartSerial.print("<LOG:GET_POINT_OK>");
     getPoint();
   } else if (command == "CAL_PRESSURE") {
     // Get points until the user lifts their finger
 
-    // mySerial.print("<LOG:GET_PRESSURE_OK>");
+    // uartSerial.print("<LOG:GET_PRESSURE_OK>");
     delay(500);
     getPressure();
   } else if (command == "TOGGLE_TS") {
@@ -118,10 +112,10 @@ void TouchManager::processCommand(String command) {
     setStorageVariables(command.substring(1));
   } else if (command.startsWith("SET_ROTATION")) {
     storage->rotation = atoi(command.substring(13).c_str());
-    mySerial.print("<LOG:OK>");
-    mySerial.print("<LOG:Rotation=");
-    mySerial.print(storage->rotation);
-    mySerial.print(">");
+    uartSerial.print("<LOG:OK>");
+    uartSerial.print("<LOG:Rotation=");
+    uartSerial.print(storage->rotation);
+    uartSerial.print(">");
   } else {
     // unknown command
     String logString = command;
@@ -129,7 +123,7 @@ void TouchManager::processCommand(String command) {
     logString.replace(">", "]");
     logString.replace(":", "|");
     logString = "<LOG:UKNOWN COMMAND " + logString + ">";
-    mySerial.print(logString);
+    uartSerial.print(logString);
   }
 }
 
@@ -142,46 +136,46 @@ void TouchManager::setStorageVariables(String data) {
 
   if (varType == "A") {
     storage->A = atol(value.c_str());
-    mySerial.print("<LOG:OK>");
-    mySerial.print("<LOG:A=");
-    mySerial.print(storage->A);
-    mySerial.print(">");
+    uartSerial.print("<LOG:OK>");
+    uartSerial.print("<LOG:A=");
+    uartSerial.print(storage->A);
+    uartSerial.print(">");
   } else if (varType == "B") {
     storage->B = atol(value.c_str());
-    mySerial.print("<LOG:OK>");
-    mySerial.print("<LOG:B=");
-    mySerial.print(storage->B);
-    mySerial.print(">");
+    uartSerial.print("<LOG:OK>");
+    uartSerial.print("<LOG:B=");
+    uartSerial.print(storage->B);
+    uartSerial.print(">");
   } else if (varType == "C") {
     storage->C = atol(value.c_str());
-    mySerial.print("<LOG:OK>");
-    mySerial.print("<LOG:C=");
-    mySerial.print(storage->C);
-    mySerial.print(">");
+    uartSerial.print("<LOG:OK>");
+    uartSerial.print("<LOG:C=");
+    uartSerial.print(storage->C);
+    uartSerial.print(">");
   } else if (varType == "D") {
     storage->D = atol(value.c_str());
-    mySerial.print("<LOG:OK>");
-    mySerial.print("<LOG:D=");
-    mySerial.print(storage->D);
-    mySerial.print(">");
+    uartSerial.print("<LOG:OK>");
+    uartSerial.print("<LOG:D=");
+    uartSerial.print(storage->D);
+    uartSerial.print(">");
   } else if (varType == "E") {
     storage->E = atol(value.c_str());
-    mySerial.print("<LOG:OK>");
-    mySerial.print("<LOG:E=");
-    mySerial.print(storage->E);
-    mySerial.print(">");
+    uartSerial.print("<LOG:OK>");
+    uartSerial.print("<LOG:E=");
+    uartSerial.print(storage->E);
+    uartSerial.print(">");
   } else if (varType == "F") {
     storage->F = atol(value.c_str());
-    mySerial.print("<LOG:OK>");
-    mySerial.print("<LOG:F=");
-    mySerial.print(storage->F);
-    mySerial.print(">");
+    uartSerial.print("<LOG:OK>");
+    uartSerial.print("<LOG:F=");
+    uartSerial.print(storage->F);
+    uartSerial.print(">");
   } else if (varType == "M") {
     storage->minResistance = atoi(value.c_str());
-    mySerial.print("<LOG:OK>");
-    mySerial.print("<LOG:minResistance=");
-    mySerial.print(storage->minResistance);
-    mySerial.print(">");
+    uartSerial.print("<LOG:OK>");
+    uartSerial.print("<LOG:minResistance=");
+    uartSerial.print(storage->minResistance);
+    uartSerial.print(">");
   } else {
     // invalid command
     String logString = data;
@@ -189,7 +183,7 @@ void TouchManager::setStorageVariables(String data) {
     logString.replace(">", "]");
     logString.replace(":", "|");
     logString = "<LOG:PACKET " + logString + " invalid>";
-    mySerial.print(logString);
+    uartSerial.print(logString);
   }
 }
 
@@ -200,13 +194,13 @@ void TouchManager::getPoint() {
     TSPoint p = ts.getPoint();
 
     if ((p.z > MINPRESSURE) && (p.z < MAXPRESSURE)) {
-      mySerial.print("<CAL:");
-      mySerial.print(p.x);
-      mySerial.print(":");
-      mySerial.print(p.y);
-      mySerial.print(":");
-      mySerial.print(p.z);
-      mySerial.print(">");
+      uartSerial.print("<CAL:");
+      uartSerial.print(p.x);
+      uartSerial.print(":");
+      uartSerial.print(p.y);
+      uartSerial.print(":");
+      uartSerial.print(p.z);
+      uartSerial.print(">");
       pointRecd = true;
     }
     delay(10);
@@ -222,19 +216,19 @@ void TouchManager::getPressure() {
     TSPoint p = ts.getPoint();
 
     if ((p.z > MINPRESSURE) && (p.z < MAXPRESSURE)) {
-      mySerial.print("<CAL:");
-      mySerial.print(p.x);
-      mySerial.print(":");
-      mySerial.print(p.y);
-      mySerial.print(":");
-      mySerial.print(p.z);
-      mySerial.print(">");
+      uartSerial.print("<CAL:");
+      uartSerial.print(p.x);
+      uartSerial.print(":");
+      uartSerial.print(p.y);
+      uartSerial.print(":");
+      uartSerial.print(p.z);
+      uartSerial.print(">");
       isTouching = true;
       touchDelay = millis();
     } else if (isTouching && ((millis() - touchDelay) >= TOUCHUPDELAY)) {
       touchUp    = true;
       isTouching = false;
-      mySerial.print("<STOP:0:0:0>");
+      uartSerial.print("<STOP:0:0:0>");
     }
 
     delay(10);

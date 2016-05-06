@@ -16,7 +16,7 @@ static int uinp_fd;			// uinput file descriptor
 bool isTouching = false;
 int prevXCoord = 0;
 int prevYCoord = 0;
-const int coordOffset = 3;  // The number of pixels a tool must travel before the touch is registered
+const int coordOffset = 2;  // The number of pixels a tool must travel before the touch is registered
 const int trackingID = 9000;
 
 
@@ -54,7 +54,7 @@ extern "C" {
 		uinp.absmin[ABS_MT_TRACKING_ID] = 0;
 		uinp.absmax[ABS_MT_TRACKING_ID] = 65535;
 		uinp.absmin[ABS_MT_PRESSURE] = 0;
-		uinp.absmax[ABS_MT_PRESSURE] = 1000;
+		uinp.absmax[ABS_MT_PRESSURE] = 255;
 
 		// Setup the uinput device
 		int ret = 0;

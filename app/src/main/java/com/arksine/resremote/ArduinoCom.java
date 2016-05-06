@@ -263,7 +263,7 @@ public class ArduinoCom implements Runnable{
         while(mRunning && (mSerialHelper.readByte() != '<')) {
             // sleep for 50ms between polling
             try {
-                Thread.sleep(50);
+                Thread.sleep(5);
             } catch (InterruptedException e) { }
         };
 

@@ -35,10 +35,10 @@
 #define CONFIG_VERSION    "rt2"
 #define MEMORYBASE        32 // where to store and retrieve EEPROM memory
 
-#define XM                A0 // Yellow (must be analog)
-#define YP                A1 // Black (must be analog)
-#define XP                A2 // Blue (can be digital)
-#define YM                A3 // Purple (can be digital)
+#define YP                A0 // Purple (must be analog)
+#define XM                A1 // Blue (must be analog)
+#define YM                A2 // Black (can be digital)
+#define XP                A3 // Yellow (can be digital)
 
 #define CALPIN            2  // When this pin is pulled high, device goes into
                              // calibration mode

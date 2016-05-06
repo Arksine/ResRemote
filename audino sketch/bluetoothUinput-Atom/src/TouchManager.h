@@ -8,7 +8,6 @@
 
 #include "definitions.h"
 #include "StorageManager.h"
-#include "AltSoftSerial.h"
 #include <TouchScreen.h>
 
 class TouchManager {
@@ -17,13 +16,11 @@ public:
   TouchManager();
   ~TouchManager();
 
-  void startSerial(long speed);
   void loopFunction();
 
 private:
 
-  TouchScreen    ts;
-  AltSoftSerial  mySerial;
+  TouchScreen ts;
   StorageManager storageManager;
   StoreStruct   *storage;
   bool start;

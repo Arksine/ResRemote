@@ -9,7 +9,13 @@
 StorageManager::StorageManager() {
   // allow 10 writes per cycle so we don't accidentally burn out the EEPROM
   EEPROM.setMaxAllowedWrites(10);
+
+  #ifdef AVR_PROMICRO16
+  EEPROM.setMemPool(MEMORYBASE, EEPROMSizeATmega32u4);
+  #else // ifdef AVR_PROMICRO16
   EEPROM.setMemPool(MEMORYBASE, EEPROMSizeATmega328);
+  #endif // ifdef AVR_PROMICRO16
+
   configAddress = EEPROM.getAddress(sizeof(StoreStruct));
   configValid   = loadConfiguration();
 

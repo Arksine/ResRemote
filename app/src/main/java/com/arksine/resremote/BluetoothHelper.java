@@ -66,6 +66,8 @@ public class BluetoothHelper implements SerialHelper {
         }
     };
 
+    //TODO:  need a broacast receiver to gracefully handle a device disconnection
+
     public BluetoothHelper(Context context){
         mContext = context;
         deviceConnected = false;

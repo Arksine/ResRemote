@@ -74,6 +74,7 @@ public class UsbHelper implements SerialHelper {
             } else if (action.equals(ACTION_USB_ATTACHED) || action.equals(ACTION_USB_DETACHED)) {
                 // send a broadcast for the main activity to repopulate the device list if a device
                 // is connected or disconnected
+                //TODO:  need to gracefully handle a device disconnection
                 Intent devChanged = new Intent(ACTION_DEVICE_CHANGED);
                 LocalBroadcastManager.getInstance(mContext).sendBroadcast(devChanged);
                 Log.i(TAG, "Usb device attached or removed");

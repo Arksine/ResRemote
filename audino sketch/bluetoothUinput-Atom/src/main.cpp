@@ -12,7 +12,11 @@ TouchManager touch;
 
 void setup() {
   pinMode(LEDPIN, OUTPUT);
-  touch.startSerial(38400);
+  digitalWrite(LEDPIN, HIGH);
+  uartSerial.begin(115200);
+
+  while (!uartSerial);
+  uartSerial.flush();
 }
 
 void loop() {
