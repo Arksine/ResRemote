@@ -5,30 +5,65 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CalTool"
         mc:Ignorable="d"
-        Title="Calibration Tool" Height="200" Width="300">
+        Title="Calibration Tool" Height="345" Width="320">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="b2v" />
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
+
         
+
         <GroupBox Header="Select Device Type">
             <StackPanel>
-                <RadioButton x:Name="rbtUinput" Content="uInput" Margin="5" GroupName="deviceType"/>
                 <RadioButton x:Name="rbtHid" Content="HID" Margin="5" IsChecked="True" GroupName="deviceType"/>
+                <StackPanel Orientation="Horizontal">
+                    <RadioButton x:Name="rbtUinput" Content="uInput" Margin="5" GroupName="deviceType"/>
+                    <Label Visibility="{Binding IsChecked,ElementName=rbtUinput,Converter={StaticResource b2v}}" 
+                           Content="Width:" Margin="20,0,0,0" ToolTip="The width of the target device in pixels.  
+                           Make sure the width reflects the orientation you want to use."/>
+                    <TextBox Visibility="{Binding IsChecked,ElementName=rbtUinput,Converter={StaticResource b2v}}" 
+                             x:Name="tbxWidth" Width="50" ToolTip="The width of the target device in Pixels. 
+                             Make sure the width reflects the orientation you want to use." Height="18"/>
+                    <Label Visibility="{Binding IsChecked,ElementName=rbtUinput,Converter={StaticResource b2v}}" 
+                           Content="Height:" ToolTip="The height of the target device in pixels. 
+                           Make sure the height reflects the orientation you want to use."/>
+                    <TextBox Visibility="{Binding IsChecked,ElementName=rbtUinput,Converter={StaticResource b2v}}" 
+                             x:Name="tbxHeight" Width="50" ToolTip="The height of the target device in Pixels. 
+                             Make sure the height reflects the orientation you want to use." Height="18"/>
+                </StackPanel>
             </StackPanel>
         </GroupBox>
 
-        <GroupBox Grid.Row="1" Header="Select COM Port">
-            <DockPanel>
-                <Button x:Name="btnRefresh" Content="Refresh" Margin="5" Click="btnRefresh_Click"/>
-                <ComboBox x:Name="cbxSelectDevice" ToolTip="Select Device" Margin="5"/>
-                
-            </DockPanel>
+        <GroupBox Grid.Row="1" Header="Select Device Rotation" ToolTip="Select the standard rotation for the device you will control.  For destop applicatons, this is typically Rotation 0.  For mobile applications, this is typicaly Rotation 90 or Rotation 270 (landscape mode)">
+            <StackPanel>
+                <RadioButton x:Name="rbtRot0" Content="Rotation 0" Margin="5" GroupName="rotation" IsChecked="True"/>
+                <RadioButton x:Name="rbtRot90" Content="Rotation 90" Margin="5" GroupName="rotation"/>
+                <RadioButton x:Name="rbtRot180" Content="Rotation 180" Margin="5" GroupName="rotation"/>
+                <RadioButton x:Name="rbtRot270" Content="Rotation 270" Margin="5" GroupName="rotation"/>
+            </StackPanel>
+            
         </GroupBox>
 
-        <Button Grid.Row="2" x:Name="btnStartCalibration" Content="Start Calibration" Margin="5" Click="btnStartCalibration_Click" HorizontalAlignment="Center"/>
-        
+        <GroupBox Grid.Row="2" Header="Select COM Port">
+            <StackPanel>
+                <DockPanel>
+                    <Button x:Name="btnRefresh" Content="Refresh" Margin="5" Click="btnRefresh_Click"/>
+                    <ComboBox x:Name="cbxSelectDevice" ToolTip="Select Device" Margin="5"/>
+                </DockPanel>
+                <CheckBox x:Name="ckbComDetails" Content="Show Com Port Details" Margin="5" ToolTip="Warning:  When enabled, the Windows Management Instrumentation is queried to populate the box below with com port details.  It is a slow operation, and can take up to 10 seconds."/>
+            </StackPanel>
+        </GroupBox>
+        <StackPanel Grid.Row="3" Orientation="Horizontal">
+            <Button x:Name="btnStartCalibration" Content="Start Calibration" Margin="5" Click="btnStartCalibration_Click" HorizontalAlignment="Left" Width="140"/>
+            <Button x:Name="btnChangeOrientaton" Content="Change Orientation Only" Margin="10,5,5,5" HorizontalAlignment="Left" Width="140" Click="btnChangeOrientaton_Click" ToolTip="Does not calibrate the device, only changes the orientation in which the device expects to output."/>
+        </StackPanel>
     </Grid>
 </Window>

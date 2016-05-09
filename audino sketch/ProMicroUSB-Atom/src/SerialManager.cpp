@@ -26,7 +26,7 @@ void SerialManager::startSerial() {
   digitalWrite(LEDPIN, HIGH);
 
   // Open the serial port
-  Serial.begin(9600);
+  Serial.begin(115200);
   connected = true;
 
   while (!Serial) {

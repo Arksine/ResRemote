@@ -1,0 +1,12 @@
+﻿<Window x:Class="CalTool.SetRotationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:CalTool"
+        mc:Ignorable="d"
+        Title="Setting Rotation" Height="200" Width="200" Background="#FFD6D6D6" Closing="Window_Closing">
+    <Grid>
+        <TextBlock x:Name="tblStatus" HorizontalAlignment="Center" Margin="0" TextWrapping="Wrap" Text="Connecting..." VerticalAlignment="Center" Width="175" TextAlignment="Center"/>
+    </Grid>
+</Window>

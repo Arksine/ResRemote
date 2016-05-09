@@ -36,6 +36,7 @@ private:
   void setStorageVariables(String data);
   void getPoint();
   void getPressure();
+  void blinkLED();
 };
 
 

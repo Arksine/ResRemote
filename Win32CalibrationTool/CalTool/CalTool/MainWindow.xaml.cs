@@ -46,62 +46,138 @@ namespace CalTool
                 return;
             }
 
-            try
+            if (ckbComDetails.IsChecked == true)
             {
-
-                ManagementObjectSearcher searcher =
-                    new ManagementObjectSearcher("root\\CIMV2",
-                    "SELECT * FROM Win32_SerialPort");
-
-
-
-                foreach (String name in portNames)
+                // The code below queries WMI to retrieve actual serial port descriptions.  The problem
+                // is that it is VERY slow (takes up to 10 seconds).  Need to see if there is a faster way to do this
+                try
                 {
-                    string description = name;
-                    foreach (ManagementObject queryObj in searcher.Get())
-                    {
-                        if (name.Equals(queryObj["DeviceID"].ToString()))
-                        {
-                            description = queryObj["Name"].ToString();
-                        }
+                    ManagementObjectSearcher searcher =
+                        new ManagementObjectSearcher("root\\CIMV2",
+                        "SELECT * FROM Win32_SerialPort");
 
-                    }
-                    this.cbxSelectDevice.Items.Add(new ComPortItem() { Name = description, Value = name });
+                    string devId;
+                    string description;
+                    foreach (ManagementObject queryObj in searcher.Get())
+                    {    
+                        devId = queryObj["DeviceID"].ToString();
+                        description = queryObj["Name"].ToString();                    
+                        this.cbxSelectDevice.Items.Add(new ComPortItem() { Name = description, Value = devId });
+                    }                                       
+                }
+                catch (ManagementException e)
+                {
+                    MessageBox.Show("An error occurred while querying for WMI data: " + e.Message);
                 }
             }
-            catch (ManagementException e)
-            {
-                MessageBox.Show("An error occurred while querying for WMI data: " + e.Message);
+            else {
+                foreach (String name in portNames)
+                {
+                    this.cbxSelectDevice.Items.Add(new ComPortItem() { Name = name, Value = name });
+                }
             }
         }
 
         private void btnRefresh_Click(object sender, RoutedEventArgs e)
         {
+            this.cbxSelectDevice.Items.Clear();
             enumerateSerialPorts();
         }
 
         private void btnStartCalibration_Click(object sender, RoutedEventArgs e)
         {
-            String device;
-            bool? deviceType = rbtHid.IsChecked;
-            if (deviceType == null)
+            
+            if (rbtHid.IsChecked == true)
             {
-                return;
+                GlobalPreferences.devType = DeviceType.HID;
             }
+            else if (rbtUinput.IsChecked == true)
+            {
+                GlobalPreferences.devType = DeviceType.UINPUT;
+                GlobalPreferences.deviceWidth = int.Parse(tbxWidth.Text);
+                GlobalPreferences.deviceHeight = int.Parse(tbxHeight.Text);
+            }
+            else
+            {
+                GlobalPreferences.devType = DeviceType.HID;
+                GlobalPreferences.deviceWidth = 10000;
+                GlobalPreferences.deviceHeight = 10000;
+            }
+
+            if (rbtRot0.IsChecked == true)
+            {
+                GlobalPreferences.rotation = Rotation.ROTATION_0;
+            }
+            else if (rbtRot90.IsChecked == true)
+            {
+                GlobalPreferences.rotation = Rotation.ROTATION_90;
+            }
+            else if (rbtRot180.IsChecked == true)
+            {
+                GlobalPreferences.rotation = Rotation.ROTATION_180;
+            }
+            else if (rbtRot270.IsChecked == true)
+            {
+                GlobalPreferences.rotation = Rotation.ROTATION_270;
+            }
+            else
+            {
+                GlobalPreferences.rotation = Rotation.ROTATION_0;
+            }
+
             try {
                 ComPortItem port = (ComPortItem)this.cbxSelectDevice.SelectedValue;
-                device = port.Value;
+                GlobalPreferences.comPort = port.Value;
             }
             catch (NullReferenceException error)
             {
                 // TODO: uncomment after testing
-                //MessageBox.Show("No COM port selected");
-                //return;
+                MessageBox.Show("No COM port selected");
+                return;
             }
 
             // TODO: add parameters to calwindows constructor so I can pass values
             CalibrationWindow calWin = new CalibrationWindow();
             calWin.Show();
+        }
+
+        private void btnChangeOrientaton_Click(object sender, RoutedEventArgs e)
+        {
+            if (rbtRot0.IsChecked == true)
+            {
+                GlobalPreferences.rotation = Rotation.ROTATION_0;
+            }
+            else if (rbtRot90.IsChecked == true)
+            {
+                GlobalPreferences.rotation = Rotation.ROTATION_90;
+            }
+            else if (rbtRot180.IsChecked == true)
+            {
+                GlobalPreferences.rotation = Rotation.ROTATION_180;
+            }
+            else if (rbtRot270.IsChecked == true)
+            {
+                GlobalPreferences.rotation = Rotation.ROTATION_270;
+            }
+            else
+            {
+                GlobalPreferences.rotation = Rotation.ROTATION_0;
+            }
+
+            try
+            {
+                ComPortItem port = (ComPortItem)this.cbxSelectDevice.SelectedValue;
+                GlobalPreferences.comPort = port.Value;
+            }
+            catch (NullReferenceException error)
+            {
+                // TODO: uncomment after testing
+                MessageBox.Show("No COM port selected");
+                return;
+            }
+
+            SetRotationWindow rotationWin = new SetRotationWindow();
+            rotationWin.Show();
         }
     }
 }

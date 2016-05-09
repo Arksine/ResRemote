@@ -55,7 +55,6 @@ void TouchManager::loopFunction() {
       touchDelay = millis();
     } else if (isTouching && ((millis() - touchDelay) >= TOUCHUPDELAY)) {
       // I might need to adjust the touch up delay, 50 - 100ms should work
-
       isTouching = false;
       SingleMultiTouch.release();
     }
@@ -254,5 +253,19 @@ void TouchManager::getPressure() {
     }
 
     delay(10);
+  }
+}
+
+void TouchManager::blinkLED() {
+  if (!serialManager.isConnected()) {
+    // don't blink if the serial manager is not connected
+    return;
+  }
+
+  for (int i = 0; i < 5; i++) {
+    delay(200);
+    digitalWrite(LEDPIN, LOW);
+    delay(200);
+    digitalWrite(LEDPIN, HIGH);
   }
 }

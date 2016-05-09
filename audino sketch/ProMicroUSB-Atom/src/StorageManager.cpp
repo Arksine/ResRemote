@@ -22,7 +22,7 @@ StorageManager::StorageManager() {
     storage.E             = 100000;
     storage.F             = 0;
     storage.minResistance = MINPRESSURE;
-    stoage.rotation       = 0;
+    storage.rotation      = 0;
   }
 }
 

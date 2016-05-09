@@ -35,10 +35,10 @@
 #define CONFIG_VERSION    "rt2"
 #define MEMORYBASE        32 // where to store and retrieve EEPROM memory
 
-#define YP                A0 // Purple (must be analog)
-#define XM                A1 // Blue (must be analog)
-#define YM                A2 // Black (can be digital)
-#define XP                A3 // Yellow (can be digital)
+#define YP                A0 // Red (must be analog)
+#define XM                A1 // White (must be analog)
+#define YM                A2 // Green (can be digital)
+#define XP                A3 // Black (can be digital)
 
 #define CALPIN            2  // When this pin is pulled high, device goes into
                              // calibration mode
@@ -50,7 +50,7 @@
                               // registered
                               // before I send touch up
 #define READLOOPDELAY     10  // min number of milliseconds between loop reads
-#define XPLATE            470 // Resistance across the X-plate of the
+#define XPLATE            800 // Resistance across the X-plate of the
                               // touchscreen
 
 struct StoreStruct {
