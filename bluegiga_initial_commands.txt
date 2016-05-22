@@ -1,0 +1,21 @@
+# This file lists the commands necessary to initialize a Bluegiga WT12 bluetooth device.
+# These commands are persistent, and only need to be entered once.  If any of these items are changed,
+# the pairing should be deleted from the host device and thus re-paired.
+
+
+SET BT NAME CamaroScreen
+SET BT CLASS 00514
+SET BT IDENT BT:47 f000 1.0.0 Resistive Touch Screen
+SET BT SSP 3 0
+SET PROFILE HID d 14 100 0 en 0409 Resistive Touch Screen
+HID SET 53 050D0904A101850109552508B10209549501750881020922A10209517508950181020942093215002501750195028102750195068101050109300931160000261027360000461027660000751095028102C0C0
+RESET
+
+SET CONTROL CONFIG 3400 0040 70A1
+SET CONTROL BAUD 38400,8N1
+SET CONTROL MUX 1
+
+
+//HID not working,  Try changing the following commands to:
+SET BT CLASS 00580
+SET PROFILE HID d 80 100 0 en 0409 Resistive Touch Screen

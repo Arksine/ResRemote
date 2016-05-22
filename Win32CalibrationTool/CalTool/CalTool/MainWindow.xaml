@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CalTool"
         mc:Ignorable="d"
-        Title="Calibration Tool" Height="345" Width="320">
+        Title="Calibration Tool" Height="345" Width="320" Icon="CalToolIcon.ico">
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="b2v" />
@@ -58,7 +58,7 @@
                     <Button x:Name="btnRefresh" Content="Refresh" Margin="5" Click="btnRefresh_Click"/>
                     <ComboBox x:Name="cbxSelectDevice" ToolTip="Select Device" Margin="5"/>
                 </DockPanel>
-                <CheckBox x:Name="ckbComDetails" Content="Show Com Port Details" Margin="5" ToolTip="Warning:  When enabled, the Windows Management Instrumentation is queried to populate the box below with com port details.  It is a slow operation, and can take up to 10 seconds."/>
+                <CheckBox x:Name="ckbComDetails" Content="Show detailed COM port description" Margin="5" ToolTip="Warning:  When enabled, the Windows Management Instrumentation is queried to populate the box below with com port details.  It is a slow operation, and can take up to 10 seconds."/>
             </StackPanel>
         </GroupBox>
         <StackPanel Grid.Row="3" Orientation="Horizontal">

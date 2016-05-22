@@ -136,22 +136,29 @@ namespace CalTool
             ArduinoMessage message;
             StringBuilder buffer = new StringBuilder();
             int ch;
-            // spin until we receive the opening packet
-            while (mRunning && (ch = arduinoPort.ReadChar()) != '<')
-            {
-                if (ch != 0)
+            // TODO:  need to catch an exception thrown here if the port is disconnected
+            try {
+                // spin until we receive the opening packet
+                while (mRunning && (ch = arduinoPort.ReadChar()) != '<')
                 {
-                    Debug.WriteLine((char)ch);
+                    if (ch != 0)
+                    {
+                        Debug.WriteLine((char)ch);
+                    }
+
+                    Thread.Sleep(5);
                 }
 
-                Thread.Sleep(5);
+                while (mRunning && (ch = arduinoPort.ReadChar()) != '>')
+                {
+                    buffer.Append((char)ch);
+                }
             }
-
-            while (mRunning && (ch = arduinoPort.ReadChar()) != '>')
+            catch(InvalidOperationException e)
             {
-                buffer.Append((char)ch);
+                Debug.WriteLine("Serial port disconnected");
+                return null;
             }
-
             String msg = buffer.ToString();
             String[] tokens = msg.Split(':');
 
