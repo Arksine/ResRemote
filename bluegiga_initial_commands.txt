@@ -19,3 +19,9 @@ SET CONTROL MUX 1
 //HID not working,  Try changing the following commands to:
 SET BT CLASS 00580
 SET PROFILE HID d 80 100 0 en 0409 Resistive Touch Screen
+HID SET 40 050D0902A1010920A100094209321500250175019502810275019506810105010901A10009300931160000261027360000461027660000751095028102C0C0C0              
+
+
+
+
+Hopefully it will think that it is a mouse rather than a digitizer and load

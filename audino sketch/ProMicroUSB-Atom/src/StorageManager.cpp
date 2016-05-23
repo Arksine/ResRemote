@@ -7,8 +7,9 @@
 #include "EEPROMex.h"
 
 StorageManager::StorageManager() {
-  // allow 10 writes per cycle so we don't accidentally burn out the EEPROM
-  EEPROM.setMaxAllowedWrites(10);
+  // allow 4 struct writes per cycle so we don't accidentally burn out the
+  // EEPROM
+  EEPROM.setMaxAllowedWrites(sizeof(StoreStruct) * 4);
   EEPROM.setMemPool(MEMORYBASE, EEPROMSizeATmega32u4);
   configAddress = EEPROM.getAddress(sizeof(StoreStruct));
   configValid   = loadConfiguration();

@@ -49,16 +49,18 @@
 #if defined(AVR_PROMICRO16)
   # define MODULE_RESET_PIN            9  // optional connection for MCU-based
                                           // module reset
+  # define HOST_BAUD                   115200
+  # define IWRAP_BAUD                  115200
 #elif defined(ARDUINO_AVR_NANO)
-  # define MODULE_RESET_PIN            12 // optional connection for MCU-based
-                                          // module reset
+  # define MODULE_RESET_PIN            12    // optional connection for
+                                             // MCU-based
+                                             // module reset
+  # define HOST_BAUD                   38400 // 38400 shouldn't be too fast for
+                                             // ALtSoftSerial on a 16mhz avr
+  # define IWRAP_BAUD                  38400 // works with 16MHz CPU clock
+                                             // (REQUIRES iWRAP RECONFIGURATION,
+                                             // DEFAULT IS 115200)
 #endif /* if defined(AVR_PROMICRO16) */
-
-#define HOST_BAUD                   38400 // 38400 shouldn't be too fast for
-                                          // ALtSoftSerial on a 16mhz avr
-#define IWRAP_BAUD                  38400 // works with 16MHz CPU clock
-                                          // (REQUIRES iWRAP RECONFIGURATION,
-                                          // DEFAULT IS 115200)
 
 
 #define IWRAP_STATE_IDLE            0

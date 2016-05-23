@@ -89,6 +89,9 @@ void my_iwrap_evt_ring(uint8_t                link_id,
                        const iwrap_address_t *address,
                        uint16_t               channel,
                        const char            *profile);
+void my_iwrap_evt_hid_output(uint8_t        link_id,
+                             uint16_t       data_length,
+                             const uint8_t *data);
 
 // ************** END IWRAP CALLBACK PROTOTYPES *************************
 
@@ -155,6 +158,7 @@ void setup() {
   iwrap_evt_pair        = my_iwrap_evt_pair;
   iwrap_evt_ready       = my_iwrap_evt_ready;
   iwrap_evt_ring        = my_iwrap_evt_ring;
+  iwrap_evt_hid_output  =  my_iwrap_evt_hid_output;
 }
 
 void loop() {
@@ -449,6 +453,14 @@ void my_iwrap_evt_ring(uint8_t link_id, const iwrap_address_t *address,
                        uint16_t channel, const char *profile) {
   iwrap_active_connections++;
   add_mapped_connection(link_id, address, profile, channel);
+}
+
+void my_iwrap_evt_hid_output(uint8_t link_id, uint16_t data_length,
+                             const uint8_t *data) {
+  // this is for data received back from the HID host (for example, raw
+  // hid or led status lights for a keybaord)
+  //
+  // I probably dont have any use for this.
 }
 
 uint8_t find_pairing_from_mac(const iwrap_address_t *mac) {
