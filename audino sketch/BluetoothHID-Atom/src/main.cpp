@@ -40,11 +40,13 @@ uint8_t  iwrap_active_connections   = 0;
 uint16_t iwrap_call_delay_ms        = 10000;
 uint32_t iwrap_call_last_time       = 0;
 uint8_t  iwrap_call_index           = 0;
-bool     iwrap_start_call           = false;
+bool     iwrap_autocall_on          = true;
+bool     stored_mac_called          = false;
 
 // index of the currently selected connected HID device
 uint8_t hid_connected_index = 0xFF;
 uint8_t spp_connected_index = 0xFF;
+String  commandBuffer       = "";
 
 // ******* END IWRAP VARIABLES **************
 
@@ -89,9 +91,10 @@ void my_iwrap_evt_ring(uint8_t                link_id,
                        const iwrap_address_t *address,
                        uint16_t               channel,
                        const char            *profile);
-void my_iwrap_evt_hid_output(uint8_t        link_id,
+
+/*void my_iwrap_evt_hid_output(uint8_t        link_id,
                              uint16_t       data_length,
-                             const uint8_t *data);
+                             const uint8_t *data);*/
 
 // ************** END IWRAP CALLBACK PROTOTYPES *************************
 
@@ -103,6 +106,8 @@ void    add_mapped_connection(uint8_t                link_id,
                               const char            *mode,
                               uint16_t               channel);
 uint8_t remove_mapped_connection(uint8_t link_id);
+void    process_arduino_command(String command);
+void    iwrap_call_hid_device();
 
 // platform-specific helper functions
 int     serial_out(const char *str);
@@ -114,7 +119,7 @@ int     iwrap_out(int            len,
 void setup() {
   // Set up LED pin (will turn on when device needs configuration or is
   // in configuration mode)
-  pinMode(LEDPIN, OUTPUT);
+  pinMode(LED_PIN, OUTPUT);
 
   // Set up touch screen toggle pin.  When its pulsed, It will send a signal
   // on another pin to toggle the touch screen switcher between
@@ -158,7 +163,8 @@ void setup() {
   iwrap_evt_pair        = my_iwrap_evt_pair;
   iwrap_evt_ready       = my_iwrap_evt_ready;
   iwrap_evt_ring        = my_iwrap_evt_ring;
-  iwrap_evt_hid_output  =  my_iwrap_evt_hid_output;
+
+  // iwrap_evt_hid_output  =  my_iwrap_evt_hid_output;
 }
 
 void loop() {
@@ -175,7 +181,6 @@ void loop() {
         iwrap_pending_call_link_id = 0xFF;
         iwrap_connected_devices    = 0;
         iwrap_active_connections   = 0;
-        iwrap_start_call           = false;
 
         // send command to test module connectivity
         #ifdef TOUCH_DEBUG
@@ -209,7 +214,9 @@ void loop() {
           serial_out(F("iWRAP initialization complete\n"));
           #endif // ifdef TOUCH_DEBUG
 
-          iwrap_time_ref = millis();
+          // set the autocall time ref so we give a connected hid device a
+          // chance to ring
+          iwrap_call_last_time = millis();
         }
         iwrap_state = IWRAP_STATE_IDLE;
       } else if ((iwrap_state == IWRAP_STATE_PENDING_CALL) &&
@@ -223,30 +230,28 @@ void loop() {
     } else if (iwrap_initialized) {
       // idle
 
-      // If we have a paired hid device that didn't ring attempt to call it.
-      if (iwrap_start_call && iwrap_pairings && (hid_connected_index == 0xFF) &&
+      // If we have a paired hid device that didn't ring, attempt to call it.
+      // there is a 10 second wait prior to the first call, and between calls
+      if (iwrap_autocall_on && iwrap_pairings &&
+          (hid_connected_index == 0xFF) &&
           !iwrap_pending_calls &&
           ((millis() - iwrap_call_last_time) >= iwrap_call_delay_ms)) {
-        // TODO: Add recently connected MAC address to storagemanager.  fetch it
-        // so we connect to the prevously connected device.  Temporarily we will
-        // use
-        // index zero for testing
-        uint8_t callIndex = 0;
+        // We will try to retreive a mac address stored in EEPROM for the first
+        // call attempt.  If it fails then the autocall functionality will
+        // cycle through all paired devices every 10 seconds
+        if (!stored_mac_called) {
+          iwrap_call_index = find_pairing_from_mac(touchManager.getMacAddress());
 
-        char  cmd[] = "CALL AA:BB:CC:DD:EE:FF 11 HID"; // HID
-        char *cptr  = cmd + 5;
-        iwrap_bintohexstr(
-          (uint8_t *)(iwrap_connection_map[callIndex]->mac.address),
-          6, &cptr, ':', 0);
+          if (iwrap_call_index == 0xFF) {
+            // either no mac address was stored, or its no longer paired.  Try
+            // connection 0
+            iwrap_call_index = 0;
+          }
 
-        #ifdef TOUCH_DEBUG
-        char s[21];
-        sprintf(s, "Calling device #%d\r\n", callIndex);
-        serial_out(s);
-        #endif // ifdef TOUCH_DEBUG
+          stored_mac_called = true;
 
-        iwrap_send_command(cmd, iwrap_mode);
-        iwrap_call_last_time = millis();
+          iwrap_call_hid_device();
+        }
       }
     }
   }
@@ -268,12 +273,6 @@ void loop() {
       iwrap_pending_commands = 0; // normally handled by the parser, but comms
                                   // failed
     }
-  } else {
-    // give HID 3 seconds to ring, if it doesn't attempt to call the paired
-    // device
-    if (!iwrap_start_call && ((millis() - iwrap_time_ref) >= 3000)) {
-      // iwrap_start_call = true;
-    }
   }
 
   // make sure that the hid index has been set and the hid control channel has
@@ -287,19 +286,33 @@ void loop() {
 void my_iwrap_rxdata(uint8_t channel, uint16_t length, const uint8_t *data) {
   bool selected = false;
 
-  if (hid_connected_index != 0xFF) {
-    if (channel == iwrap_connection_map[hid_connected_index]->link_spp) {
+  if (spp_connected_index != 0xFF) {
+    if (channel == iwrap_connection_map[spp_connected_index]->link_spp) {
       selected = true;
-
-      // TODO: peak at the 2nd item in the data array.  If it is a #, then this
-      //       is a command to do something in Iwrap, like for example
-      // attempting
-      //       to switch devices if multiple devices are connected
 
       // we have data from the rfcomm channel (should be SPP), now send the data
       // to the touch manager for processing
       for (uint8_t i = 0; i < length; i++) {
-        touchManager.addToCommandBuffer(data[i]);
+        if ((char)i == '<') {
+          // packet is beginning, clear buffer
+          commandBuffer = "";
+        }
+        else if ((char)i == '>') {
+          // end of packet, send the command for processing
+          if (commandBuffer.charAt(0) == '#') {
+            // This is a command that affects arduino or iwrap functionality
+            // directly
+            process_arduino_command(commandBuffer);
+          } else {
+            // This command is related to device calibration.  Send it to the
+            // TouchManager class for processing
+            touchManager.processCommand(commandBuffer);
+          }
+        }
+        else {
+          // part of the stream, add it to the buffer
+          commandBuffer += (char)i;
+        }
       }
     }
   }
@@ -455,14 +468,13 @@ void my_iwrap_evt_ring(uint8_t link_id, const iwrap_address_t *address,
   add_mapped_connection(link_id, address, profile, channel);
 }
 
-void my_iwrap_evt_hid_output(uint8_t link_id, uint16_t data_length,
+/*void my_iwrap_evt_hid_output(uint8_t link_id, uint16_t data_length,
                              const uint8_t *data) {
-  // this is for data received back from the HID host (for example, raw
-  // hid or led status lights for a keybaord)
-  //
-  // I probably dont have any use for this.
-}
-
+   // this is for data received back from the HID host (for example, raw
+   // hid or led status lights for a keybaord)
+   //
+   // I probably dont have any use for this.
+   }*/
 uint8_t find_pairing_from_mac(const iwrap_address_t *mac) {
   uint8_t i;
 
@@ -509,8 +521,18 @@ void add_mapped_connection(uint8_t link_id, const iwrap_address_t *addr,
       // Since this link is the data/interrupt channel, this will be the
       // currently connected device if one has not been set.
       if (hid_connected_index == 0xFF) {
-        hid_connected_index = pairing_index;
-        touchManager.setHidLinkId(link_id);
+        // Make sure the control link has been established.
+        if (iwrap_connection_map[pairing_index]->link_hid_control != 0xFF) {
+          hid_connected_index = pairing_index;
+          touchManager.setHidLinkId(link_id);
+          touchManager.setMacAddress(addr);
+          stored_mac_called = true;
+        } else {
+          // The control channel did not connect, but the interrupt did.  Close
+          // this link
+          String closeCmd = "CLOSE " + String(link_id);
+          iwrap_send_command(closeCmd.c_str(), iwrap_mode);
+        }
       }
     }
   } else if (strcmp(mode, "RFCOMM") == 0) {
@@ -579,6 +601,88 @@ uint8_t remove_mapped_connection(uint8_t link_id) {
   return 0xFF;
 }
 
+void process_arduino_command(String command) {
+  // get rid of the leading # that signifies an arduino command
+  command.remove(0);
+
+  if (command == "GET_DEVICE_LIST") {
+    // Sends a list of MAC Addresses currently paired with the bluetooth
+    char   macAddr[]  = "AABBCCDDEEFF";
+    char  *macptr     = macAddr;
+    String macString  = "<MAC_COUNT:" + String(iwrap_pairings) + ">";
+    const char *count = macString.c_str();
+    iwrap_send_data(iwrap_connection_map[spp_connected_index]->link_spp,
+                    macString.length(),  (uint8_t *)count, iwrap_mode);
+
+    for (uint8_t i = 0; i < iwrap_pairings; i++) {
+      iwrap_bintohexstr((uint8_t *)(iwrap_connection_map[i]->mac.address),
+                        6, &macptr, 0, 0);
+      macString = "<MAC:";
+      macString.concat(macAddr);
+      macString += ">";
+      const char *data = macString.c_str();
+
+      iwrap_send_data(iwrap_connection_map[spp_connected_index]->link_spp,
+                      macString.length(),  (uint8_t *)data, iwrap_mode);
+    }
+  } else if (command == "TOGGLE_AUTOCALL") {
+    // Toggle autocall function off/on
+    iwrap_autocall_on = !iwrap_autocall_on;
+  } else if (command.startsWith("CONN_HID")) {
+    // attempts to connect to the mac address specified
+    const char *macAddr = command.substring(9).c_str();
+    char *end;
+    iwrap_address_t curMac;
+    iwrap_hexstrtobin(macAddr, &end, curMac.address, 6);
+
+    iwrap_call_index = find_pairing_from_mac(&curMac);
+
+    if (iwrap_call_index == 0xFF) {
+      // error, mac address not found TODO: send to debug, perhaps send a packet
+      // back to the BT host telling them the mac doesn't exist
+    } else {
+      // Call this device
+      if ((hid_connected_index != 0xFF) &&
+          (iwrap_connection_map[hid_connected_index]->link_hid_control != 0xFF)) {
+        // a hid device is currently connected, disconnect first
+        String closeCmd = "CLOSE " +
+                          String(
+          iwrap_connection_map[hid_connected_index]->link_hid_control);
+        iwrap_send_command(closeCmd.c_str(), iwrap_mode);
+      }
+
+      iwrap_call_hid_device();
+    }
+  #ifdef CAMARO_SCREEN
+  } else if (command == "TOGGLE_TS") {
+    // send a pulse to turn the touch screen on or off
+    // TODO:  need state tracking for touch screen switcher.  Also need to
+    // set up output pins
+  } else if (command.startsWith("HDLINK_INPUT")) {
+    // changes to the next input, or the selected input
+    // TODO:  need state tracking for this (which input is selected), and
+  #endif // ifdef CAMARO_SCREEN
+  }
+}
+
+void iwrap_call_hid_device() {
+  char  cmd[] = "CALL AA:BB:CC:DD:EE:FF 11 HID"; // HID
+  char *cptr  = cmd + 5;
+
+  iwrap_bintohexstr(
+    (uint8_t *)(iwrap_connection_map[iwrap_call_index]->mac.address),
+    6, &cptr, ':', 0);
+
+  #ifdef TOUCH_DEBUG
+  char s[21];
+  sprintf(s, "Calling device #%d\r\n", iwrap_call_index);
+  serial_out(s);
+  #endif // ifdef TOUCH_DEBUG
+
+  iwrap_send_command(cmd, iwrap_mode);
+  iwrap_call_last_time = millis();
+}
+
 int serial_out(const char *str) {
   // debug output to host goes through hardware serial
   return UsbSerial.print(str);
@@ -590,6 +694,7 @@ int serial_out(const __FlashStringHelper *str) {
 }
 
 int iwrap_out(int len, unsigned char *data) {
-  // iWRAP output to module goes through software serial
+  // iWRAP output to module goes through software serial if using Atmega 328,
+  // otherwise it goes through uart
   return IwrapSerial.write(data, len);
 }
