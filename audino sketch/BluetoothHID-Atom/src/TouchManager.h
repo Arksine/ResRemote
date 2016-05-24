@@ -11,10 +11,12 @@ public:
   TouchManager();
   ~TouchManager();
 
-  void setHidLinkId(uint8_t linkId);
-  void setrfCommLinkId(uint8_t linkId);
-  void addToCommandBuffer(char ch);
-  void checkForTouch();
+  void             setHidLinkId(uint8_t linkId);
+  void             setrfCommLinkId(uint8_t linkId);
+  void             setMacAddress(const iwrap_address_t *mac);
+  iwrap_address_t* getMacAddress();
+  void             processCommand(String command);
+  void             checkForTouch();
 
 private:
 
@@ -26,14 +28,12 @@ private:
   bool isTouching;
   unsigned long loopDelay;
   unsigned long touchDelay;
-  String  commandBuffer;
   uint8_t iwrapMode;
   uint8_t rfCommLinkId;
 
   void sendHidCoordinate(int tX,
                          int tY,
                          int tZ);
-  void processCommand(String command);
   void setStorageVariables(String data);
   void getPoint();
   void getPressure();

@@ -11,21 +11,20 @@
 TouchManager::TouchManager() : ts(XP, YP, XM, YM, XPLATE), touchDevice(),
   storageManager()
 {
-  storage       = storageManager.getStorage();
-  loopDelay     = 0;
-  touchDelay    = 0;
-  isTouching    = false;
-  isStarted     = storageManager.isConfigValid();
-  commandBuffer = "";
-  iwrapMode     = IWRAP_MODE_MUX;
-  rfCommLinkId  = 0xFE;
+  storage      = storageManager.getStorage();
+  loopDelay    = 0;
+  touchDelay   = 0;
+  isTouching   = false;
+  isStarted    = storageManager.isConfigValid();
+  iwrapMode    = IWRAP_MODE_MUX;
+  rfCommLinkId = 0xFE;
 
   // Turn on LED to notify user that device needs calibration / is in
   // calibration mode if necessary
   if (!isStarted) {
-    digitalWrite(LEDPIN, HIGH);
+    digitalWrite(LED_PIN, HIGH);
   } else {
-    digitalWrite(LEDPIN, LOW);
+    digitalWrite(LED_PIN, LOW);
   }
 }
 
@@ -39,38 +38,32 @@ void TouchManager::setrfCommLinkId(uint8_t linkId) {
   rfCommLinkId = linkId;
 }
 
+void TouchManager::setMacAddress(const iwrap_address_t *mac) {
+  memcpy(storage->macAddress.address, mac->address, 6);
+  storageManager.updateConfiguration();
+}
+
+iwrap_address_t * TouchManager::getMacAddress() {
+  return &(storage->macAddress);
+}
+
 void TouchManager::checkForTouch() {
-  if (isStarted && ((millis() - loopDelay) >= READLOOPDELAY)) {
+  if (isStarted && ((millis() - loopDelay) >= READ_LOOP_DELAY)) {
     // If we aren't accepting serial data, process touch data
     loopDelay = millis();
     TSPoint p = ts.getPoint();
 
-    if ((p.z > MINPRESSURE) && (p.z < MAXPRESSURE)) {
+    if ((p.z > MIN_PRESSURE) && (p.z < MAX_PRESSURE)) {
       sendHidCoordinate(p.x, p.y, p.z);
       isTouching = true;
       touchDelay = millis();
-    } else if (isTouching && ((millis() - touchDelay) >= TOUCHUPDELAY)) {
+    } else if (isTouching && ((millis() - touchDelay) >= TOUCH_UP_DELAY)) {
       // I might need to adjust the touch up delay, 50 - 100ms should work
       // TODO: need to create a class that manages Bluetooth HID reports
       // and sends the correct report over bluetooth
       touchDevice.release();
       isTouching = false;
     }
-  }
-}
-
-void TouchManager::addToCommandBuffer(char ch) {
-  if (ch == '<') {
-    // packet is beginning, clear buffer
-    commandBuffer = "";
-  }
-  else if (ch == '>') {
-    // end of packet, parse it
-    processCommand(commandBuffer);
-  }
-  else {
-    // part of the stream, add it to the buffer
-    commandBuffer += ch;
   }
 }
 
@@ -109,7 +102,7 @@ void TouchManager::sendHidCoordinate(int tX, int tY, int tZ) {
     dY = ((storage->D * tX) + (storage->E * tY) + storage->F + 5000l) / 10000l;
   }
 
-  dZ = MAXPRESSURE - (tZ - storage->minResistance);
+  dZ = MAX_PRESSURE - (tZ - storage->minResistance);
 
   touchDevice.moveTo(dX, dY);
 }
@@ -126,7 +119,7 @@ void TouchManager::processCommand(String command) {
     // We have a calibration command, so stop sending hid coordinates
     if (isStarted) {
       isStarted = false;
-      digitalWrite(LEDPIN, HIGH);
+      digitalWrite(LED_PIN, HIGH);
     }
     getPoint();
   } else if (command == "CAL_PRESSURE") {
@@ -137,30 +130,27 @@ void TouchManager::processCommand(String command) {
     // We have a calibration command, so stop sending hid coordinates
     if (isStarted) {
       isStarted = false;
-      digitalWrite(LEDPIN, HIGH);
+      digitalWrite(LED_PIN, HIGH);
     }
     delay(500);
     getPressure();
-  } else if (command == "TOGGLE_TS") {
-    // Toggles the touch screen switcher
-    // TODO: Bring whichever pin is connected to touchscreen to high here
   } else if (command == "CAL_FAIL") {
     // if we have some kind of valid configuration, restart sending hid reports
     isStarted = storageManager.isConfigValid();
 
     if (isStarted) {
-      digitalWrite(LEDPIN, LOW);
+      digitalWrite(LED_PIN, LOW);
     }
   } else if (command == "CAL_SUCCESS") {
     storageManager.updateConfiguration();
     isStarted = true;
-    digitalWrite(LEDPIN, LOW);
+    digitalWrite(LED_PIN, LOW);
   } else if (command == "ERROR") {
     // if we have some kind of valid configuration, restart sending hid reports
     isStarted = storageManager.isConfigValid();
 
     if (isStarted) {
-      digitalWrite(LEDPIN, LOW);
+      digitalWrite(LED_PIN, LOW);
     }
   }
   else if (command.startsWith("$")) {
@@ -243,7 +233,7 @@ void TouchManager::getPoint() {
   while (!pointRecd) {
     TSPoint p = ts.getPoint();
 
-    if ((p.z > MINPRESSURE) && (p.z < MAXPRESSURE)) {
+    if ((p.z > MIN_PRESSURE) && (p.z < MAX_PRESSURE)) {
       String point = "<CAL:" +
                      String(p.x) + ":" +
                      String(p.y) + ":" +
@@ -263,7 +253,7 @@ void TouchManager::getPressure() {
   while (!touchUp) {
     TSPoint p = ts.getPoint();
 
-    if ((p.z > MINPRESSURE) && (p.z < MAXPRESSURE)) {
+    if ((p.z > MIN_PRESSURE) && (p.z < MAX_PRESSURE)) {
       String point = "<CAL:" +
                      String(p.x) + ":" +
                      String(p.y) + ":" +
@@ -271,7 +261,7 @@ void TouchManager::getPressure() {
       writeToSerial(point);
       isTouching = true;
       touchDelay = millis();
-    } else if (isTouching && ((millis() - touchDelay) >= TOUCHUPDELAY)) {
+    } else if (isTouching && ((millis() - touchDelay) >= TOUCH_UP_DELAY)) {
       touchUp    = true;
       isTouching = false;
       writeToSerial("<STOP:0:0:0>");

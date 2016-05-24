@@ -33,6 +33,12 @@
 #define ROTATION_180      2
 #define ROTATION_270      3
 
+// When CAMARO_SCREEN is defined, functionality specific to my camaro touch
+// screen controller is included.  For example, the arduino can send a pulse
+// to the touch screen switcher.  It can also change inputs on the HDLink
+// interface.
+#define CAMARO_SCREEN
+
 /**
  * IWRAP DEFINITIONS
  */
@@ -90,40 +96,56 @@ typedef struct {
 
 
 #define CONFIG_VERSION    "rt2"
-#define MEMORYBASE        32 // where to store and retrieve EEPROM
-                             // memory
+#define MEMORY_BASE        32 // where to store and retrieve EEPROM
+                              // memory
 
-#define YP                A0 // Red (must be analog)
-#define XM                A1 // White (must be analog)
-#define YM                A2 // Green (can be digital)
-#define XP                A3 // Black (can be digital)
+#define YP                A0  // Y+ Red (must be analog)
+#define XM                A1  // X- White (must be analog)
+#define YM                A2  // Y- MinusGreen (can be digital)
+#define XP                A3  // X+ Black (can be digital)
 
-#define LEDPIN 3
-#define TOUCH_SCREEN_TOGGLE_PIN 4
+#define LED_PIN 3
 
-#define MINPRESSURE       10
-#define MAXPRESSURE       1000
-#define TOUCHUPDELAY      100 // min number of milliseconds a touch isn't
-                              // registered
-                              // before I send touch up
-#define READLOOPDELAY     10  // min number of milliseconds between loop reads
-#define XPLATE            800 // Resistance across the X-plate of the
-                              // touchscreen
+#ifdef CAMARO_SCREEN
+# define TOUCH_SCREEN_TOGGLE_PIN 4
+# define INPUT_TOGGLE_PIN 5
+
+// Touch screen state tracking
+# define TOUCH_SCREEN_MODE_MYLINK 0
+# define TOUCH_SCREEN_MODE_MIRROR 1
+
+// HDlink state tracking
+# define HDLINK_INPUT_MYLINK 0
+# define HDLINK_INPUT_HDMI 1
+# define HDLINK_INPUT_FRONT_CAMERA 2
+
+// TODO:  Add av2 if necessary, need to check HD
+#endif /* ifdef CAMARO_SCREEN */
+
+#define MIN_PRESSURE       10
+#define MAX_PRESSURE       1000
+#define TOUCH_UP_DELAY      100 // min number of milliseconds a touch isn't
+                                // registered
+                                // before I send touch up
+#define READ_LOOP_DELAY     10  // min number of milliseconds between loop reads
+#define XPLATE            800   // Resistance across the X-plate of the
+                                // touchscreen
 
 struct StoreStruct {
-  char version[4];            // unique identifier to make sure we are getting
-                              // the right data
+  char version[4];              // unique identifier to make sure we are getting
+                                // the right data
 
   // A-F are coefficients calculated to convert touch coordinates to device
   // coordinates
-  long A;
-  long B;
-  long C;
-  long D;
-  long E;
-  long F;
-  int  minResistance;
-  byte rotation;
+  long            A;
+  long            B;
+  long            C;
+  long            D;
+  long            E;
+  long            F;
+  int             minResistance;
+  byte            rotation;
+  iwrap_address_t macAddress;
 };
 
 #endif /* ifndef DEFINITIONS_H */

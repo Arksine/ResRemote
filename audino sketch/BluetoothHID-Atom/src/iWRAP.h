@@ -43,16 +43,16 @@
 
 #define IWRAP_DEBUG
 #define IWRAP_INCLUDE_MUX
-#define IWRAP_INCLUDE_RXDATA          // Needed to receive serial port data
-                                      // RFCOMM/SPP
-#define IWRAP_INCLUDE_TXDATA          // Allows us to show what data was sent
-                                      // over the
-                                      // serial port, useful for debugging (will
-                                      // also
-                                      // show HID data sent)
+#define IWRAP_INCLUDE_RXDATA // Needed to receive serial port data
+                             // RFCOMM/SPP
+#define IWRAP_INCLUDE_TXDATA // Allows us to show what data was sent
+                             // over the
+                             // serial port, useful for debugging (will
+                             // also
+                             // show HID data sent)
 
-#define IWRAP_INCLUDE_EVT_HID_OUTPUT  // probably don't need to implement this
-#define IWRAP_INCLUDE_EVT_HID_SUSPEND // not sure I need this either
+// #define IWRAP_INCLUDE_EVT_HID_OUTPUT
+// #define IWRAP_INCLUDE_EVT_HID_SUSPEND // not sure I need this either
 #define IWRAP_INCLUDE_RSP_CALL
 #define IWRAP_INCLUDE_RSP_LIST_COUNT
 #define IWRAP_INCLUDE_RSP_LIST_RESULT

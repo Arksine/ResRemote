@@ -7,14 +7,17 @@
 #include "EEPROMex.h"
 
 StorageManager::StorageManager() {
+  #ifdef TOUCH_DEBUG
+
   // allow 4 struct writes per cycle so we don't accidentally burn out the
   // EEPROM
   EEPROM.setMaxAllowedWrites(sizeof(StoreStruct) * 4);
+  #endif // ifdef TOUCH_DEBUG
 
   #ifdef AVR_PROMICRO16
-  EEPROM.setMemPool(MEMORYBASE, EEPROMSizeATmega32u4);
+  EEPROM.setMemPool(MEMORY_BASE, EEPROMSizeATmega32u4);
   #else // ifdef AVR_PROMICRO16
-  EEPROM.setMemPool(MEMORYBASE, EEPROMSizeATmega328);
+  EEPROM.setMemPool(MEMORY_BASE, EEPROMSizeATmega328);
   #endif // ifdef AVR_PROMICRO16
 
   configAddress = EEPROM.getAddress(sizeof(StoreStruct));
@@ -28,7 +31,7 @@ StorageManager::StorageManager() {
     storage.D             = 0;
     storage.E             = 100000;
     storage.F             = 0;
-    storage.minResistance = MINPRESSURE;
+    storage.minResistance = MIN_PRESSURE;
     storage.rotation      = 0;
   }
 }
