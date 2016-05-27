@@ -26,7 +26,25 @@
     <string name="pref_select_device_default">NO_DEVICE</string>
 
     <string name="pref_start_calibration">Start Calibration</string>
-    <string name="pref_set_controller_orentation">Set Controller to Current Orientation</string>
+
+    <string name="pref_orientation_category">Orientation Settings</string>
+
+    <string name="pref_select_orientation">Select Orientation</string>
+    <string-array name="pref_select_orientation_entries">
+        <item>Current Rotation of Device</item>
+        <item>Portrait (Rotation 0)</item>
+        <item>Landscape (Rotation 90)</item>
+        <item>Reverse Portrait (Rotation 180)</item>
+        <item>Reverse Landscape (Rotation 270)</item>
+    </string-array>
+    <string-array name="pref_select_orientation_values">
+        <item>4</item>
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+    </string-array>
+    <string name="pref_set_controller_orentation">Set Touch Controller to Selected Orientation</string>
     <string name="title_activity_calibrate_touch">CalibrateTouchActivity</string>
 
     <string name="orientation_dialog_title">Set Controller Orientation</string>

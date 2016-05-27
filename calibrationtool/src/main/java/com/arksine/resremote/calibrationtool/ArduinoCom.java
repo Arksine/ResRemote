@@ -105,10 +105,36 @@ public class ArduinoCom extends Thread{
             return;
         }
 
-        DisplayManager displayManager = (DisplayManager) mContext.getSystemService(Context.DISPLAY_SERVICE);
-        Display myDisplay = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
+        String orientationPref = PreferenceManager.getDefaultSharedPreferences(mContext)
+                .getString("pref_key_select_orientation", "0");
+        int selectedOrientation = Integer.parseInt(orientationPref);
 
-        int rotation = myDisplay.getRotation();
+        int rotation;
+
+        switch (selectedOrientation) {
+            case 0:
+                rotation = 0;
+                break;
+            case 1:
+                rotation = 1;
+                break;
+            case 2:
+                rotation = 2;
+                break;
+            case 3:
+                rotation = 3;
+                break;
+            case 4:
+                DisplayManager displayManager = (DisplayManager) mContext.getSystemService(Context.DISPLAY_SERVICE);
+                Display myDisplay = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
+
+                rotation = myDisplay.getRotation();
+                break;
+            default:
+                rotation = 0;
+        }
+
+
 
         String data = "<SET_ROTATION:" + Integer.toString(rotation) + ">";
         mSerialHelper.writeString(data);

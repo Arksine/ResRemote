@@ -25,16 +25,11 @@ public:
   void    iwrapDisconnect(uint8_t link_id);
   uint8_t iwrapGetHidChannel();
   uint8_t iwrapGetSppChannel();
-
-  // Iwrap helpers
-  uint8_t findPairingFromMac(const iwrap_address_t *mac);
-  uint8_t findPairingFromLinkId(uint8_t link_id);
   void    addMappedConnection(uint8_t                link_id,
                               const iwrap_address_t *addr,
                               const char            *mode,
                               uint16_t               channel);
-  uint8_t removeMappedConnection(uint8_t link_id);
-  void    callHidDevice();
+
 
   const uint8_t iwrapMode;
 
@@ -62,6 +57,12 @@ private:
   uint8_t sppConnectedIndex;
 
   TouchManager touchManager;
+
+  // private iwrap helpers
+  uint8_t findPairingFromMac(const iwrap_address_t *mac);
+  uint8_t findPairingFromLinkId(uint8_t link_id);
+  uint8_t removeMappedConnection(uint8_t link_id);
+  void    callHidDevice();
 };
 
 extern IwrapManager_ IwrapManager;

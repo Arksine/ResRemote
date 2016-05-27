@@ -18,8 +18,21 @@
         android:key="pref_key_start_calibration"
         android:title="@string/pref_start_calibration" >
     </PreferenceScreen>
-    <PreferenceScreen
+    <PreferenceCategory
+        android:key="pref_key_orientation_category"
+        android:title="@string/pref_orientation_category">
+        <ListPreference
+            android:key="pref_key_select_orientation"
+            android:title="@string/pref_select_orientation"
+            android:dialogTitle="@string/pref_select_orientation"
+            android:entries="@array/pref_select_orientation_entries"
+            android:entryValues="@array/pref_select_orientation_values"
+            android:persistent="true"
+            android:defaultValue="4" />
+
+        <PreferenceScreen
         android:key="pref_key_set_controller_orientation"
-        android:title="@string/pref_set_controller_orentation" >
-    </PreferenceScreen>
+        android:title="@string/pref_set_controller_orentation"/> >
+
+    </PreferenceCategory>
 </PreferenceScreen>

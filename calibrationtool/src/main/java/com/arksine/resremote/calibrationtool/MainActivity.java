@@ -17,6 +17,7 @@ import android.util.Log;
 import android.view.View;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -62,6 +63,8 @@ public class MainActivity extends AppCompatActivity {
                     (ListPreference) root.findPreference("pref_key_select_device");
             PreferenceScreen startCalibrationPref  =
                     (PreferenceScreen) root.findPreference("pref_key_start_calibration");
+            ListPreference selectOrientationPref =
+                    (ListPreference) root.findPreference("pref_key_select_orientation");
             PreferenceScreen setOrientationPref =
                     (PreferenceScreen) root.findPreference("pref_key_set_controller_orientation");
 
@@ -69,6 +72,7 @@ public class MainActivity extends AppCompatActivity {
             populateDeviceListView();
 
             selectDeviceTypePref.setSummary(selectDeviceTypePref.getEntry());
+            selectOrientationPref.setSummary(selectOrientationPref.getEntry());
 
             /**
              * The listeners below update the preference summary after they have been changed
@@ -89,6 +93,17 @@ public class MainActivity extends AppCompatActivity {
             });
 
             selectDevicePref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(Preference preference, Object newValue) {
+                    ListPreference list = (ListPreference)preference;
+                    CharSequence[] entries = list.getEntries();
+                    int index = list.findIndexOfValue((String)newValue);
+                    preference.setSummary(entries[index]);
+                    return true;
+                }
+            });
+
+            selectOrientationPref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
                 @Override
                 public boolean onPreferenceChange(Preference preference, Object newValue) {
                     ListPreference list = (ListPreference)preference;

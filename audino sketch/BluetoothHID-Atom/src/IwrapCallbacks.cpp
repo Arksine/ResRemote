@@ -9,7 +9,7 @@ AltSoftSerial altSerial;
 String rxPacket = "";
 
 void assignIwrapCallbacks() {
-  // assign transport/debug output
+  // assign transport output
   iwrap_output = iwrapOut;
 
   #ifdef TOUCH_DEBUG
@@ -42,17 +42,17 @@ void cbIwrapRxdata(uint8_t channel, uint16_t length, const uint8_t *data) {
     // we have data from the rfcomm channel (should be SPP), now send the data
     // to the touch manager for processing
     for (uint8_t i = 0; i < length; i++) {
-      if ((char)i == '<') {
+      if ((char)data[i] == '<') {
         // packet is beginning, clear buffer
         rxPacket = "";
       }
-      else if ((char)i == '>') {
+      else if ((char)data[i]  == '>') {
         // end of packet, send  for processing
         IwrapManager.processRxPacket(rxPacket);
       }
       else {
         // part of the stream, add it to the buffer
-        rxPacket += (char)i;
+        rxPacket += (char)data[i];
       }
     }
   }
@@ -98,7 +98,10 @@ void cbIwrapRspListResult(uint8_t                link_id,
                           uint8_t                role,
                           uint8_t                crypt,
                           uint16_t               buffer,
-                          uint8_t                eretx);
+                          uint8_t                eretx) {
+  IwrapManager.addMappedConnection(link_id, addr, mode, channel);
+}
+
 void cbIwrapRspSet(uint8_t     category,
                    const char *option,
                    const char *value) {

@@ -11,6 +11,8 @@ adb remount
 adb push Vendor_XXXX_Product_YYYY.idc /system/usr/idc/.
 adb reboot
 
+If you are using a rooted stock rom, the above commands may not work.  You need an app like ES File Explorer that can change system permissions.  Copy the .idc files to your devices internal store, then use ES File explorer to move them to the /system/user/idc directory.  Finally, change permissions to rw-r-r, with the owner and group set as root.  When finished change the system permissions back to read only. More in depth instructions to follow.
+
 4) After reboot connect your arduino running the HID Resistive Remote sketch.  It should load the corresponding idc.  This can be verified with the following adb command:
 
 adb shell dumpsys input
